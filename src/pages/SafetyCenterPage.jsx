@@ -284,16 +284,16 @@ export default function SafetyCenterPage() {
         </div>
       )}
 
-      {/* 2. EMERGENCY SOS CONTROL HERO (Idle State) */}
+      {/* 2. EMERGENCY SOS CONTROL HERO (Idle State - Calm Slate/Navy Aesthetic) */}
       {!isEmergency && (
-        <div className="rounded-3xl bg-gradient-to-r from-[#200f14] via-[#2d1219] to-[#1a0a0f] border border-rose-600/40 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-72 bg-gradient-to-l from-rose-600/10 to-transparent pointer-events-none" />
+        <div className="rounded-3xl bg-gradient-to-r from-[#0d1726] via-[#0f213d] to-[#0b1628] border border-slate-700/80 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-72 bg-gradient-to-l from-teal-500/5 to-transparent pointer-events-none" />
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold uppercase tracking-wider">
-                <Radio className="w-3.5 h-3.5 text-rose-400 animate-spin" />
-                Emergency Distress Protocol
+              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-teal-500/30 text-[11px] font-bold uppercase tracking-wider">
+                <Radio className="w-3.5 h-3.5 text-teal-400" />
+                Standby Emergency Protocol
               </div>
 
               <h3 className="text-xl sm:text-2xl font-black text-white">
@@ -301,18 +301,19 @@ export default function SafetyCenterPage() {
               </h3>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                Test TripMate's emergency broadcast routine. Protected by an accidental activation confirmation step before generating high-priority telemetry, medical ICE vault disclosures, and simulated contact SMS alerts.
+                Test TripMate's emergency broadcast routine. Protected by an accidental activation confirmation step before generating high-priority telemetry, medical ICE vault disclosures, and simulated contact alerts.
               </p>
 
-              <div className="text-[11px] text-rose-300/80 font-mono pt-1">
+              <div className="text-[11px] text-slate-400 font-mono pt-1">
                 * Demonstration Sandbox: Real 911 / 112 / 110 emergency dispatch lines are NOT triggered.
               </div>
             </div>
 
             {/* Prominent SOS Trigger Control */}
             <button
+              type="button"
               onClick={openSosConfirmation}
-              className="px-6 py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-sm tracking-wide shadow-xl shadow-rose-600/40 transition transform active:scale-95 flex items-center justify-center gap-2.5 shrink-0"
+              className="px-6 py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-sm tracking-wide shadow-xl shadow-rose-600/30 transition transform active:scale-95 flex items-center justify-center gap-2.5 shrink-0"
             >
               <ShieldAlert className="w-5 h-5 animate-pulse" />
               <span>TRIGGER SOS SIMULATOR</span>

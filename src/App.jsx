@@ -1,6 +1,8 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import AppLayout from './components/layout/AppLayout';
+import LandingPage from './components/landing/LandingPage';
+import AuthModal from './components/auth/AuthModal';
 
 import OverviewPage from './pages/OverviewPage';
 import JourneysPage from './pages/JourneysPage';
@@ -33,12 +35,47 @@ function PageContent() {
   }
 }
 
+function MainApp() {
+  const {
+    activePage,
+    setActivePage,
+    setIsDemoMode,
+    isAuthModalOpen,
+    closeAuthModal,
+    openAuthModal,
+    authModalMode,
+  } = useApp();
+
+  if (activePage === 'landing') {
+    return (
+      <>
+        <LandingPage
+          onOpenAuth={(mode) => openAuthModal(mode)}
+          onEnterDemo={() => {
+            setIsDemoMode(true);
+            setActivePage('overview');
+          }}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={closeAuthModal}
+          initialMode={authModalMode}
+        />
+      </>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <PageContent />
+    </AppLayout>
+  );
+}
+
 export default function App() {
   return (
     <AppProvider>
-      <AppLayout>
-        <PageContent />
-      </AppLayout>
+      <MainApp />
     </AppProvider>
   );
 }

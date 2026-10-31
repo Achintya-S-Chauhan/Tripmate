@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
+import api, { getToken, setToken, removeToken } from '../services/api';
 import {
   INITIAL_USER,
   INITIAL_SETTINGS,
@@ -27,29 +28,42 @@ const STORAGE_KEYS = {
   GEOFENCE_LOGS: 'tripmate_demo_geofence_logs',
 };
 
-
 export function AppProvider({ children }) {
   // Navigation
   const [activePage, setActivePage] = useState(() => {
     try {
       const hash = window.location.hash.replace('#', '');
-      if (['overview', 'journeys', 'trip-details', 'insights', 'safety', 'saved-places', 'settings'].includes(hash)) {
+      if (['landing', 'overview', 'journeys', 'trip-details', 'insights', 'safety', 'saved-places', 'settings'].includes(hash)) {
         return hash;
       }
     } catch {}
-    return 'overview';
+    return getToken() ? 'overview' : 'landing';
   });
   const [activeJourneyId, setActiveJourneyId] = useState('journey-campus-commute');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Authentication & Cloud Sync
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getToken());
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
+
+  const openAuthModal = (mode = 'login') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+  const closeAuthModal = () => setIsAuthModalOpen(false);
+
   // Sync hash routing
   useEffect(() => {
     const handleHashChange = () => {
       try {
         const hash = window.location.hash.replace('#', '');
-        if (['overview', 'journeys', 'trip-details', 'insights', 'safety', 'saved-places', 'settings'].includes(hash)) {
+        if (['landing', 'overview', 'journeys', 'trip-details', 'insights', 'safety', 'saved-places', 'settings'].includes(hash)) {
           setActivePage(hash);
         }
       } catch {}
@@ -308,22 +322,24 @@ export function AppProvider({ children }) {
   // Toast notifications
   const [toasts, setToasts] = useState([]);
 
-  // Sync to local storage
+  // Sync to local storage (only in guest/demo mode, preserve user separation)
   useEffect(() => {
+    if (isAuthenticated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.JOURNEYS, JSON.stringify(journeys));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
-  }, [journeys]);
+  }, [journeys, isAuthenticated]);
 
   useEffect(() => {
+    if (isAuthenticated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.SAVED_PLACES, JSON.stringify(savedPlaces));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
-  }, [savedPlaces]);
+  }, [savedPlaces, isAuthenticated]);
 
   useEffect(() => {
     try {
@@ -374,12 +390,13 @@ export function AppProvider({ children }) {
   }, [journeyLiveState]);
 
   useEffect(() => {
+    if (isAuthenticated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.TRUSTED_CONTACTS, JSON.stringify(trustedContacts));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
-  }, [trustedContacts]);
+  }, [trustedContacts, isAuthenticated]);
 
   useEffect(() => {
     try {
@@ -440,6 +457,135 @@ export function AppProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Backend & Cloud Data Synchronization
+  const fetchCloudData = useCallback(async () => {
+    try {
+      const [journeysRes, placesRes, contactsRes] = await Promise.all([
+        api.journeys.getAll().catch(() => null),
+        api.savedPlaces.getAll().catch(() => null),
+        api.trustedContacts.getAll().catch(() => null),
+      ]);
+
+      if (Array.isArray(journeysRes?.journeys)) {
+        setJourneys(journeysRes.journeys);
+        if (journeysRes.journeys.length > 0) {
+          setActiveJourneyId(journeysRes.journeys[0].id || journeysRes.journeys[0]._id);
+        } else {
+          setActiveJourneyId('');
+        }
+      }
+      if (Array.isArray(placesRes?.places)) {
+        setSavedPlaces(placesRes.places);
+      }
+      if (Array.isArray(contactsRes?.contacts)) {
+        setTrustedContacts(contactsRes.contacts);
+      }
+    } catch (err) {
+      console.warn('⚠️ [TripMate] Cloud data sync error:', err.message);
+    }
+  }, []);
+
+  // Health check & session verification on startup
+  useEffect(() => {
+    let mounted = true;
+
+    api.health
+      .check()
+      .then(() => {
+        if (!mounted) return;
+        setIsBackendConnected(true);
+
+        // If a JWT token exists in localStorage, verify session
+        const token = getToken();
+        if (token) {
+          api.auth
+            .getMe()
+            .then((res) => {
+              if (!mounted) return;
+              if (res.user) {
+                setUser(res.user);
+                setIsAuthenticated(true);
+                setIsDemoMode(false);
+                fetchCloudData();
+              }
+            })
+            .catch(() => {
+              if (!mounted) return;
+              removeToken();
+              setIsAuthenticated(false);
+              setActivePage('landing');
+            });
+        }
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setIsBackendConnected(false);
+      });
+
+    const handleAuthExpired = () => {
+      setIsAuthenticated(false);
+      setIsDemoMode(false);
+      setActivePage('landing');
+      addToast('Session Expired', 'Your cloud session expired. Please sign in again.', 'warning');
+    };
+    window.addEventListener('tripmate:auth-expired', handleAuthExpired);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('tripmate:auth-expired', handleAuthExpired);
+    };
+  }, [fetchCloudData]);
+
+  // Auth Action Handlers
+  const loginUser = async (email, password) => {
+    setIsAuthLoading(true);
+    try {
+      const res = await api.auth.login({ email, password });
+      if (res.token) {
+        setToken(res.token);
+        setUser(res.user);
+        setIsAuthenticated(true);
+        setIsDemoMode(false);
+        await fetchCloudData();
+        setActivePage('overview');
+        return res;
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const registerUser = async (formData) => {
+    setIsAuthLoading(true);
+    try {
+      const res = await api.auth.register(formData);
+      if (res.token) {
+        setToken(res.token);
+        setUser(res.user);
+        setIsAuthenticated(true);
+        setIsDemoMode(false);
+        await fetchCloudData();
+        setActivePage('overview');
+        return res;
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const logoutUser = () => {
+    api.auth.logout();
+    setIsAuthenticated(false);
+    setIsDemoMode(false);
+    setUser(INITIAL_USER);
+    setJourneys(INITIAL_JOURNEYS);
+    setSavedPlaces(INITIAL_SAVED_PLACES);
+    setTrustedContacts(INITIAL_TRUSTED_CONTACTS);
+    setActiveJourneyId('journey-campus-commute');
+    setActivePage('landing');
+    addToast('Signed Out', 'You have been signed out of your cloud account.', 'info');
+  };
+
   // Active journey helper
   const activeJourney = journeys.find((j) => j.id === activeJourneyId) || journeys[0];
 
@@ -450,59 +596,81 @@ export function AppProvider({ children }) {
   };
 
   // Itinerary & Packing updates
-  const togglePackingItem = (journeyId, itemId) => {
-    setJourneys((prev) =>
-      prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
-        return {
-          ...journey,
-          packingList: journey.packingList.map((item) =>
-            item.id === itemId ? { ...item, checked: !item.checked } : item
-          ),
-        };
-      })
+  const togglePackingItem = async (journeyId, itemId) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const updatedList = (journey.packingList || []).map((item) =>
+      item.id === itemId || item._id === itemId ? { ...item, checked: !item.checked } : item
     );
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, packingList: updatedList } : j))
+    );
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { packingList: updatedList });
+      } catch (e) {
+        console.warn('Backend packing update failed', e.message);
+      }
+    }
   };
 
-  const addPackingItem = (journeyId, itemData) => {
+  const addPackingItem = async (journeyId, itemData) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const newItem = {
+      id: 'pk-' + Date.now(),
+      item: itemData.item,
+      category: itemData.category || 'Gear',
+      checked: false,
+      mandatory: Boolean(itemData.mandatory),
+    };
+    const updatedList = [...(journey.packingList || []), newItem];
+
     setJourneys((prev) =>
-      prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
-        const newItem = {
-          id: 'pk-' + Date.now(),
-          item: itemData.item,
-          category: itemData.category || 'Gear',
-          checked: false,
-          mandatory: Boolean(itemData.mandatory),
-        };
-        return {
-          ...journey,
-          packingList: [...journey.packingList, newItem],
-        };
-      })
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, packingList: updatedList } : j))
     );
     addToast('Packing Item Added', `${itemData.item} added to trip packing list.`, 'success');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { packingList: updatedList });
+      } catch (e) {
+        console.warn('Backend packing item add failed', e.message);
+      }
+    }
   };
 
-  const toggleItineraryItem = (journeyId, dayNumber, itemIndex) => {
+  const toggleItineraryItem = async (journeyId, dayNumber, itemIndex) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const updatedDays = (journey.itineraryDays || []).map((d) => {
+      if (d.day !== dayNumber) return d;
+      const updatedItems = [...d.items];
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        done: !updatedItems[itemIndex].done,
+      };
+      return { ...d, items: updatedItems };
+    });
+
     setJourneys((prev) =>
-      prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
-        const updatedDays = journey.itineraryDays.map((d) => {
-          if (d.day !== dayNumber) return d;
-          const updatedItems = [...d.items];
-          updatedItems[itemIndex] = {
-            ...updatedItems[itemIndex],
-            done: !updatedItems[itemIndex].done,
-          };
-          return { ...d, items: updatedItems };
-        });
-        return { ...journey, itineraryDays: updatedDays };
-      })
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, itineraryDays: updatedDays } : j))
     );
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { itineraryDays: updatedDays });
+      } catch (e) {
+        console.warn('Backend itinerary toggle failed', e.message);
+      }
+    }
   };
 
-  const addExpenseToJourney = (journeyId, expenseData) => {
+  const addExpenseToJourney = async (journeyId, expenseData) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
     const newExpense = {
       id: 'exp-' + Date.now(),
       title: expenseData.title,
@@ -510,21 +678,21 @@ export function AppProvider({ children }) {
       category: expenseData.category || 'Dining',
       date: expenseData.date || new Date().toISOString().split('T')[0],
     };
+    const updatedExpenses = [newExpense, ...(journey.expenses || [])];
+    const updatedSpent = (journey.spent || 0) + newExpense.amount;
 
     setJourneys((prev) =>
-      prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
-        const updatedExpenses = [newExpense, ...journey.expenses];
-        const updatedSpent = journey.spent + newExpense.amount;
-        return {
-          ...journey,
-          expenses: updatedExpenses,
-          spent: updatedSpent,
-        };
-      })
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, expenses: updatedExpenses, spent: updatedSpent } : j))
     );
-
     addToast('Expense Recorded', `$${newExpense.amount} added under ${newExpense.category}.`, 'success');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { expenses: updatedExpenses, spent: updatedSpent });
+      } catch (e) {
+        console.warn('Backend expense add failed', e.message);
+      }
+    }
   };
 
   // Helper to recalculate journey distance, duration and CO2 totals
@@ -543,7 +711,27 @@ export function AppProvider({ children }) {
   };
 
   // Create new journey with structured trip chain support
-  const createJourney = (journeyData) => {
+  const createJourney = async (journeyData) => {
+    // If authenticated, persist to backend
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.journeys.create(journeyData);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => [cloudJ, ...prev]);
+          setActiveJourneyId(cloudJ.id);
+          setActivePage('trip-details');
+          addToast('Saved to MongoDB Atlas', `"${cloudJ.title}" synced to your cloud account.`, 'success');
+          try { confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } }); } catch {}
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Backend journey create failed:', err);
+        addToast('Journey Creation Failed', err.message || 'Could not save journey to cloud.', 'error');
+        throw err;
+      }
+    }
+
     const newId = (journeyData.destination || 'journey').toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
     const origin = journeyData.origin || 'City Departure Point';
     const destination = journeyData.destination || 'Destination Point';
@@ -648,10 +836,28 @@ export function AppProvider({ children }) {
   };
 
   // Edit Journey metadata
-  const editJourney = (journeyId, updatedData) => {
+  const editJourney = async (journeyId, updatedData) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.journeys.update(journeyId, updatedData);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) =>
+            prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j))
+          );
+          addToast('Saved to MongoDB Atlas', 'Your trip chain details were saved successfully.', 'success');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Backend journey update failed:', err);
+        addToast('Journey Update Failed', err.message || 'Could not save changes to cloud.', 'error');
+        throw err;
+      }
+    }
+
     setJourneys((prev) =>
       prev.map((j) => {
-        if (j.id !== journeyId) return j;
+        if (j.id !== journeyId && j._id !== journeyId) return j;
         const updated = {
           ...j,
           ...updatedData,
@@ -671,12 +877,22 @@ export function AppProvider({ children }) {
   };
 
   // Delete Journey
-  const deleteJourney = (journeyId) => {
-    const target = journeys.find((j) => j.id === journeyId);
+  const deleteJourney = async (journeyId) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.delete(journeyId);
+      } catch (err) {
+        console.error('Backend journey delete failed:', err);
+        addToast('Journey Delete Failed', err.message || 'Could not delete journey from cloud.', 'error');
+        throw err;
+      }
+    }
+
+    const target = journeys.find((j) => j.id === journeyId || j._id === journeyId);
     setJourneys((prev) => {
-      const nextList = prev.filter((j) => j.id !== journeyId);
+      const nextList = prev.filter((j) => j.id !== journeyId && j._id !== journeyId);
       if (activeJourneyId === journeyId) {
-        setActiveJourneyId(nextList[0]?.id || '');
+        setActiveJourneyId(nextList[0]?.id || nextList[0]?._id || '');
       }
       return nextList;
     });
@@ -684,7 +900,7 @@ export function AppProvider({ children }) {
   };
 
   // Add Segment to Journey
-  const addSegmentToJourney = (journeyId, segmentData) => {
+  const addSegmentToJourney = async (journeyId, segmentData) => {
     const dist = parseFloat(segmentData.distanceKm) || 0;
     const dur = parseInt(segmentData.durationMinutes, 10) || 0;
     const mode = segmentData.transportMode || segmentData.mode || 'Walking';
@@ -694,9 +910,42 @@ export function AppProvider({ children }) {
       ? parseFloat(segmentData.co2SavedKg) 
       : parseFloat((dist * (type === 'walking' || type === 'bicycle' ? 0.21 : 0.14)).toFixed(1));
 
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const payload = {
+          title: segmentData.title || `${mode} Leg`,
+          origin: segmentData.origin || segmentData.from || 'Origin',
+          destination: segmentData.destination || segmentData.to || 'Destination',
+          type,
+          mode,
+          transportMode: mode,
+          distanceKm: dist,
+          durationMinutes: dur,
+          startTime: segmentData.startTime || '10:00 AM',
+          endTime: segmentData.endTime || (dur > 0 ? '10:30 AM' : '10:00 AM'),
+          transitLine: segmentData.transitLine || null,
+          co2SavedKg: co2Saved,
+          isStop,
+          notes: segmentData.notes || '',
+          status: segmentData.status || 'Scheduled',
+        };
+        const res = await api.journeys.addSegment(journeyId, payload);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
+          addToast('Saved to MongoDB Atlas', `Added leg: ${payload.origin} ➔ ${payload.destination}.`, 'success');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Failed to add segment on backend:', err);
+        addToast('Segment Add Failed', err.message || 'Could not add segment on server.', 'error');
+        throw err;
+      }
+    }
+
     setJourneys((prev) =>
       prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
+        if (journey.id !== journeyId && journey._id !== journeyId) return journey;
         const currentSegments = journey.segments || journey.travelSegments || [];
         const newOrder = currentSegments.length + 1;
         const newSeg = {
@@ -743,19 +992,44 @@ export function AppProvider({ children }) {
   };
 
   // Edit Segment in Journey
-  const editSegmentInJourney = (journeyId, segmentId, updatedData) => {
+  const editSegmentInJourney = async (journeyId, segmentId, updatedData) => {
     const dist = parseFloat(updatedData.distanceKm) || 0;
     const dur = parseInt(updatedData.durationMinutes, 10) || 0;
     const mode = updatedData.transportMode || updatedData.mode || 'Walking';
     const type = updatedData.type || updatedData.modeType || 'walking';
     const isStop = updatedData.isStop !== undefined ? updatedData.isStop : (type === 'cafe_stop' || type === 'activity');
 
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const payload = {
+          ...updatedData,
+          type,
+          mode,
+          transportMode: mode,
+          distanceKm: dist,
+          durationMinutes: dur,
+          isStop,
+        };
+        const res = await api.journeys.updateSegment(journeyId, segmentId, payload);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
+          addToast('Saved to MongoDB Atlas', 'Segment in trip chain successfully modified.', 'success');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Failed to update segment on backend:', err);
+        addToast('Segment Update Failed', err.message || 'Could not update segment on server.', 'error');
+        throw err;
+      }
+    }
+
     setJourneys((prev) =>
       prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
+        if (journey.id !== journeyId && journey._id !== journeyId) return journey;
         const currentSegments = journey.segments || journey.travelSegments || [];
         const updatedSegments = currentSegments.map((s) => {
-          if (s.id !== segmentId) return s;
+          if (s.id !== segmentId && s._id !== segmentId) return s;
           const co2Saved = updatedData.co2SavedKg !== undefined
             ? parseFloat(updatedData.co2SavedKg)
             : parseFloat((dist * (type === 'walking' || type === 'bicycle' ? 0.21 : 0.14)).toFixed(1));
@@ -803,12 +1077,28 @@ export function AppProvider({ children }) {
   };
 
   // Delete Segment from Journey
-  const deleteSegmentFromJourney = (journeyId, segmentId) => {
+  const deleteSegmentFromJourney = async (journeyId, segmentId) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.journeys.deleteSegment(journeyId, segmentId);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
+          addToast('Saved to MongoDB Atlas', 'Segment removed and trip chain re-ordered.', 'info');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Failed to delete segment on backend:', err);
+        addToast('Segment Delete Failed', err.message || 'Could not remove segment from server.', 'error');
+        throw err;
+      }
+    }
+
     setJourneys((prev) =>
       prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
+        if (journey.id !== journeyId && journey._id !== journeyId) return journey;
         const currentSegments = journey.segments || journey.travelSegments || [];
-        const filtered = currentSegments.filter((s) => s.id !== segmentId);
+        const filtered = currentSegments.filter((s) => s.id !== segmentId && s._id !== segmentId);
         const reindexed = filtered.map((s, idx) => ({ ...s, order: idx + 1 }));
         const totals = calculateJourneyTotals(reindexed);
 
@@ -827,25 +1117,43 @@ export function AppProvider({ children }) {
   };
 
   // Reorder Segment in Journey
-  const reorderSegmentInJourney = (journeyId, segmentId, direction) => {
+  const reorderSegmentInJourney = async (journeyId, segmentId, direction) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const currentSegments = [...(journey.segments || journey.travelSegments || [])];
+    const index = currentSegments.findIndex((s) => s.id === segmentId || s._id === segmentId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentSegments.length) return;
+
+    const temp = currentSegments[index];
+    currentSegments[index] = currentSegments[targetIndex];
+    currentSegments[targetIndex] = temp;
+
+    const reindexed = currentSegments.map((s, idx) => ({ ...s, order: idx + 1 }));
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.journeys.update(journeyId, { segments: reindexed });
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
+          addToast('Saved to MongoDB Atlas', `Segment moved ${direction} and saved to cloud.`, 'info');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Failed to save reordered segments to cloud:', err);
+        addToast('Reorder Failed', err.message || 'Could not update segment order on server.', 'error');
+        throw err;
+      }
+    }
+
     setJourneys((prev) =>
-      prev.map((journey) => {
-        if (journey.id !== journeyId) return journey;
-        const currentSegments = [...(journey.segments || journey.travelSegments || [])];
-        const index = currentSegments.findIndex((s) => s.id === segmentId);
-        if (index === -1) return journey;
-
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= currentSegments.length) return journey;
-
-        const temp = currentSegments[index];
-        currentSegments[index] = currentSegments[targetIndex];
-        currentSegments[targetIndex] = temp;
-
-        const reindexed = currentSegments.map((s, idx) => ({ ...s, order: idx + 1 }));
-
+      prev.map((j) => {
+        if (j.id !== journeyId && j._id !== journeyId) return j;
         return {
-          ...journey,
+          ...j,
           segments: reindexed,
           travelSegments: reindexed,
         };
@@ -856,11 +1164,36 @@ export function AppProvider({ children }) {
   };
 
   // Saved places handlers
-  const toggleSavedPlace = (placeId) => {
+  const toggleSavedPlace = async (placeId) => {
+    const target = savedPlaces.find((p) => p.id === placeId || p._id === placeId);
+    const nextState = target ? !target.isMustVisit : true;
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const idToUpdate = target?._id || target?.id || placeId;
+        const res = await api.savedPlaces.update(idToUpdate, { isMustVisit: nextState });
+        if (res.place) {
+          const cloudP = { ...res.place, id: res.place.id || res.place._id, coords: [res.place.lat, res.place.lng] };
+          setSavedPlaces((prev) =>
+            prev.map((p) => (p.id === placeId || p._id === placeId ? cloudP : p))
+          );
+          addToast(
+            nextState ? 'Marked as Must-Visit' : 'Removed from Must-Visit',
+            target?.name || 'Saved Place',
+            'info'
+          );
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to toggle saved place on cloud:', err);
+        addToast('Update Failed', err.message || 'Could not update place on server.', 'error');
+        return;
+      }
+    }
+
     setSavedPlaces((prev) =>
       prev.map((p) => {
-        if (p.id !== placeId) return p;
-        const nextState = !p.isMustVisit;
+        if (p.id !== placeId && p._id !== placeId) return p;
         addToast(
           nextState ? 'Marked as Must-Visit' : 'Removed from Must-Visit',
           p.name,
@@ -871,7 +1204,39 @@ export function AppProvider({ children }) {
     );
   };
 
-  const addSavedPlace = (newPlaceData) => {
+  const addSavedPlace = async (newPlaceData) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const payload = {
+          name: newPlaceData.name,
+          category: newPlaceData.category || 'Hotel',
+          city: newPlaceData.city || 'Kyoto',
+          country: newPlaceData.country || 'Japan',
+          address: newPlaceData.address || '',
+          rating: parseFloat(newPlaceData.rating) || 4.8,
+          hours: newPlaceData.hours || '24/7 Access',
+          tags: newPlaceData.tags,
+          notes: newPlaceData.notes || '',
+          radiusMeters: parseInt(newPlaceData.radiusMeters, 10) || 250,
+          lat: newPlaceData.coords ? newPlaceData.coords[0] : (parseFloat(newPlaceData.lat) || 35.0116),
+          lng: newPlaceData.coords ? newPlaceData.coords[1] : (parseFloat(newPlaceData.lng) || 135.7681),
+          imageUrl: newPlaceData.imageUrl,
+          isMustVisit: Boolean(newPlaceData.isMustVisit),
+        };
+        const res = await api.savedPlaces.create(payload);
+        if (res.place) {
+          const cloudP = { ...res.place, id: res.place.id || res.place._id, coords: [res.place.lat, res.place.lng] };
+          setSavedPlaces((prev) => [cloudP, ...prev]);
+          addToast('Saved to MongoDB Atlas', `Safe Zone "${cloudP.name}" added to cloud profile.`, 'success');
+          return cloudP;
+        }
+      } catch (err) {
+        console.error('Backend place create failed:', err);
+        addToast('Save Failed', err.message || 'Could not save place to server.', 'error');
+        throw err;
+      }
+    }
+
     const newPlace = {
       id: 'sp-' + Date.now(),
       name: newPlaceData.name,
@@ -900,10 +1265,33 @@ export function AppProvider({ children }) {
     addToast('Safe Zone Created', `${newPlace.name} (${newPlace.radiusMeters}m geofence) added to safe zones.`, 'success');
   };
 
-  const editSavedPlace = (placeId, updatedData) => {
+  const editSavedPlace = async (placeId, updatedData) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const payload = { ...updatedData };
+        if (updatedData.coords && Array.isArray(updatedData.coords)) {
+          payload.lat = updatedData.coords[0];
+          payload.lng = updatedData.coords[1];
+        }
+        const res = await api.savedPlaces.update(placeId, payload);
+        if (res.place) {
+          const cloudP = { ...res.place, id: res.place.id || res.place._id, coords: [res.place.lat, res.place.lng] };
+          setSavedPlaces((prev) =>
+            prev.map((p) => (p.id === placeId || p._id === placeId ? cloudP : p))
+          );
+          addToast('Saved to MongoDB Atlas', 'Geofence parameters updated successfully on cloud.', 'success');
+          return cloudP;
+        }
+      } catch (err) {
+        console.error('Backend place update failed:', err);
+        addToast('Update Failed', err.message || 'Could not update place on server.', 'error');
+        throw err;
+      }
+    }
+
     setSavedPlaces((prev) =>
       prev.map((p) => {
-        if (p.id !== placeId) return p;
+        if (p.id !== placeId && p._id !== placeId) return p;
         return {
           ...p,
           ...updatedData,
@@ -914,14 +1302,40 @@ export function AppProvider({ children }) {
     addToast('Safe Zone Updated', 'Geofence parameters updated successfully.', 'success');
   };
 
-  const removeSavedPlace = (placeId) => {
-    const place = savedPlaces.find((p) => p.id === placeId);
-    setSavedPlaces((prev) => prev.filter((p) => p.id !== placeId));
+  const removeSavedPlace = async (placeId) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.savedPlaces.delete(placeId);
+      } catch (err) {
+        console.error('Backend place delete failed:', err);
+        addToast('Delete Failed', err.message || 'Could not delete place from server.', 'error');
+        throw err;
+      }
+    }
+
+    const place = savedPlaces.find((p) => p.id === placeId || p._id === placeId);
+    setSavedPlaces((prev) => prev.filter((p) => p.id !== placeId && p._id !== placeId));
     addToast('Safe Zone Removed', `${place?.name || 'Place'} removed from safe zones.`, 'info');
   };
 
   // Trusted Contact Management (CRUD)
-  const addTrustedContact = (contactData) => {
+  const addTrustedContact = async (contactData) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.trustedContacts.create(contactData);
+        if (res.contact) {
+          const cloudC = { ...res.contact, id: res.contact.id || res.contact._id };
+          setTrustedContacts((prev) => [...prev, cloudC]);
+          addToast('Saved to MongoDB Atlas', `${cloudC.name} added to cloud ICE contacts.`, 'success');
+          return cloudC;
+        }
+      } catch (err) {
+        console.error('Backend contact sync error:', err);
+        addToast('Save Failed', err.message || 'Could not save contact to server.', 'error');
+        throw err;
+      }
+    }
+
     const newContact = {
       id: 'tc-' + Date.now(),
       name: contactData.name.trim(),
@@ -937,10 +1351,28 @@ export function AppProvider({ children }) {
     addToast('Contact Added', `${newContact.name} added to trusted emergency contacts.`, 'success');
   };
 
-  const editTrustedContact = (id, updatedData) => {
+  const editTrustedContact = async (id, updatedData) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.trustedContacts.update(id, updatedData);
+        if (res.contact) {
+          const cloudC = { ...res.contact, id: res.contact.id || res.contact._id };
+          setTrustedContacts((prev) =>
+            prev.map((c) => (c.id === id || c._id === id ? cloudC : c))
+          );
+          addToast('Saved to MongoDB Atlas', 'Emergency contact details were saved on cloud.', 'success');
+          return cloudC;
+        }
+      } catch (err) {
+        console.error('Backend contact update error:', err);
+        addToast('Update Failed', err.message || 'Could not update contact on server.', 'error');
+        throw err;
+      }
+    }
+
     setTrustedContacts((prev) =>
       prev.map((c) => {
-        if (c.id !== id) return c;
+        if (c.id !== id && c._id !== id) return c;
         return {
           ...c,
           ...updatedData,
@@ -954,9 +1386,19 @@ export function AppProvider({ children }) {
     addToast('Contact Updated', 'Emergency contact details were saved.', 'success');
   };
 
-  const removeTrustedContact = (id) => {
-    const target = trustedContacts.find((c) => c.id === id);
-    setTrustedContacts((prev) => prev.filter((c) => c.id !== id));
+  const removeTrustedContact = async (id) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.trustedContacts.delete(id);
+      } catch (err) {
+        console.error('Backend contact delete error:', err);
+        addToast('Delete Failed', err.message || 'Could not delete contact from server.', 'error');
+        throw err;
+      }
+    }
+
+    const target = trustedContacts.find((c) => c.id === id || c._id === id);
+    setTrustedContacts((prev) => prev.filter((c) => c.id !== id && c._id !== id));
     addToast('Contact Removed', `${target?.name || 'Contact'} removed from trusted contacts.`, 'info');
   };
 
@@ -1367,6 +1809,20 @@ export function AppProvider({ children }) {
     startSosSimulation,
     cancelSosSimulation,
     closeSosModal,
+    // Authentication & Cloud Sync
+    isAuthenticated,
+    isAuthLoading,
+    isBackendConnected,
+    isDemoMode,
+    setIsDemoMode,
+    isAuthModalOpen,
+    authModalMode,
+    openAuthModal,
+    closeAuthModal,
+    loginUser,
+    registerUser,
+    logoutUser,
+    fetchCloudData,
     // Safety Center & Simulated Emergency Session
     emergencySession,
     startEmergencySession,

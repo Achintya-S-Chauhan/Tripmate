@@ -11,11 +11,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Info,
-  HelpCircle,
+  Database,
+  LogIn,
+  LogOut,
+  User as UserIcon,
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-
 
 export default function SettingsPage() {
   const {
@@ -24,6 +26,9 @@ export default function SettingsPage() {
     resetAllDemoData,
     exportJourneyData,
     user,
+    isAuthenticated,
+    openAuthModal,
+    logoutUser,
     addToast,
   } = useApp();
 
@@ -46,8 +51,66 @@ export default function SettingsPage() {
           Settings & Companion Preferences
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Configure mobility units, safety beacon sensitivity, map styling, and demo data portability.
+          Configure account session, mobility units, safety parameters, and demonstration data portability.
         </p>
+      </div>
+
+      {/* Section 0: Account & Cloud Session */}
+      <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <img
+              src={user.avatarUrl}
+              alt={user.name}
+              className="w-12 h-12 rounded-2xl object-cover border-2 border-teal-500/40 shadow-md"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white">{user.name}</h3>
+                {isAuthenticated && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                    Cloud Synced
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 font-mono">
+                {isAuthenticated ? user.email : 'Local Guest Session'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={logoutUser}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span>Sign Out</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In to Cloud</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span className="flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5 text-teal-400" />
+            Database Persistence: {isAuthenticated ? 'MongoDB Atlas (Cluster0)' : 'Browser Local Storage'}
+          </span>
+          <span className="font-mono text-slate-500 text-[11px]">
+            Home: {user.homeCity || 'Kyoto, Japan'}
+          </span>
+        </div>
       </div>
 
       {/* Section 1: Units & Regional Preferences */}
@@ -212,11 +275,12 @@ export default function SettingsPage() {
               </p>
             </div>
             <button
+              type="button"
               onClick={exportJourneyData}
               className="w-full py-2 px-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
-              Download JSON Backup
+              <span>Download JSON Backup</span>
             </button>
           </div>
 
@@ -229,11 +293,12 @@ export default function SettingsPage() {
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setConfirmResetOpen(true)}
               className="w-full py-2 px-3 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs transition flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
-              Reset All Demo Data
+              <span>Reset All Demo Data</span>
             </button>
           </div>
         </div>
@@ -245,19 +310,21 @@ export default function SettingsPage() {
           <div className="bg-[#0f172a] border border-rose-600/50 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
             <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
               <AlertTriangle className="w-5 h-5" />
-              Reset Demo Records?
+              <span>Reset Demo Records?</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              This will restore the initial demonstration journeys, saved places, and clear browser local storage session state.
+              This will restore initial demonstration journeys, saved places, and reset local changes.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
               <button
+                type="button"
                 onClick={() => setConfirmResetOpen(false)}
                 className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   resetAllDemoData();
                   setConfirmResetOpen(false);
