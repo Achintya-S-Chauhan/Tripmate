@@ -1385,6 +1385,20 @@ export const SAFETY_ICE_VAULT = {
 
 export const EMBASSIES_DIRECTORY = [
   {
+    country: "India",
+    city: "New Delhi & National Dispatch Centers",
+    representation: "National Unified Emergency Response (112 ERSS) & Consular Services",
+    hotline24h: "112 (National Unified Emergency Response)",
+    address: "Emergency Response Support System (ERSS), Ministry of Home Affairs, New Delhi",
+    dutyOfficer: "Unified 24/7 Police (100), Fire (101) & Ambulance (108) dispatch via 112",
+    services: [
+      "Unified Emergency Response (112)",
+      "Women Safety Helpline (1090 / 181)",
+      "Medical Ambulance Dispatch (108)",
+      "Tourist Police Assistance",
+    ],
+  },
+  {
     country: "Japan",
     city: "Tokyo (Embassy) & Osaka (Consulate)",
     representation: "U.S. Embassy Tokyo & Consulate General Osaka-Kobe",

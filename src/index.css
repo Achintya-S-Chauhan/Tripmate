@@ -109,3 +109,67 @@
 .animate-radar {
   animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* Accessible focus visible rings */
+:focus-visible {
+  outline: 2px solid #14b8a6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Leaflet dark theme attribution and controls */
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.88) !important;
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+  backdrop-filter: blur(6px);
+  padding: 3px 8px !important;
+  border-radius: 6px;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.leaflet-control-attribution a {
+  color: #2dd4bf !important;
+  text-decoration: underline;
+}
+
+.leaflet-bar a {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #1e293b !important;
+  color: #14b8a6 !important;
+}
+
+/* Smooth motion for buttons, cards, and interactive elements */
+button,
+a,
+input,
+select,
+textarea {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Full prefers-reduced-motion compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-spin,
+  .animate-ping,
+  .animate-pulse,
+  .animate-radar,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+

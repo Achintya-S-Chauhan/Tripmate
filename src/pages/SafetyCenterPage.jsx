@@ -39,6 +39,7 @@ import {
 
 export default function SafetyCenterPage() {
   const {
+    user,
     openSosConfirmation,
     startEmergencySession,
     endEmergencySession,
@@ -305,7 +306,7 @@ export default function SafetyCenterPage() {
               </p>
 
               <div className="text-[11px] text-slate-400 font-mono pt-1">
-                * Demonstration Sandbox: Real 911 / 112 / 110 emergency dispatch lines are NOT triggered.
+                * Demonstration Sandbox: Real 112 (India ERSS) / 911 / 110 emergency dispatch lines are NOT triggered.
               </div>
             </div>
 
@@ -357,91 +358,114 @@ export default function SafetyCenterPage() {
         </div>
 
         {/* Contacts List Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {trustedContacts.map((contact) => (
-            <div
-              key={contact.id}
-              className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 hover:border-slate-600 transition flex flex-col justify-between space-y-3"
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-extrabold text-white truncate" title={contact.name}>
-                    {contact.name}
-                  </h4>
-                  <span
-                    className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0 ${
-                      contact.notifyOnSos !== false
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                        : 'bg-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {contact.notifyOnSos !== false ? 'SOS Alert Recipient' : 'Excluded from SOS'}
-                  </span>
-                </div>
-
-                <div className="text-xs text-slate-400 font-medium">
-                  {contact.relation || 'Emergency Contact'}
-                </div>
-
-                <div className="font-mono text-teal-400 text-xs font-semibold pt-1">
-                  {contact.phone}
-                </div>
-
-                {contact.email && (
-                  <div className="text-[11px] text-slate-400 truncate font-mono">
-                    {contact.email}
+        {trustedContacts.length === 0 ? (
+          <div className="text-center py-8 bg-slate-900/40 rounded-xl border border-slate-800/80 p-6 space-y-2">
+            <UserCheck className="w-8 h-8 text-teal-400/50 mx-auto" />
+            <h4 className="text-sm font-bold text-white">No Emergency Contacts Registered</h4>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Add trusted friends, family, or travel partners to receive simulated distress telemetry if you trigger an SOS.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {trustedContacts.map((contact) => (
+              <div
+                key={contact.id || contact._id}
+                className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 hover:border-slate-600 transition flex flex-col justify-between space-y-3"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-sm font-extrabold text-white truncate" title={contact.name}>
+                      {contact.name}
+                    </h4>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0 ${
+                        contact.notifyOnSos !== false
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : 'bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {contact.notifyOnSos !== false ? 'SOS Alert Recipient' : 'Excluded from SOS'}
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Card Footer: Action Controls */}
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-slate-500 font-mono">
-                  Channel: Simulated SMS
-                </span>
+                  <div className="text-xs text-slate-400 font-medium">
+                    {contact.relation || 'Emergency Contact'}
+                  </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(contact)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
-                    title="Edit Contact"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
+                  <div className="font-mono text-teal-400 text-xs font-semibold pt-1">
+                    {contact.phone}
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeletingContact(contact)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition"
-                    title="Remove Contact"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {contact.email && (
+                    <div className="text-[11px] text-slate-400 truncate font-mono">
+                      {contact.email}
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer: Action Controls */}
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Channel: Simulated SMS
+                  </span>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(contact)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+                      title="Edit Contact"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeletingContact(contact)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition"
+                      title="Remove Contact"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4. DIGITAL ICE SAFETY VAULT & "I'M SAFE" CHECK-IN */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 2 Cols: Digital Medical & Identity ICE Vault */}
-        <div className="lg:col-span-2 bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="lg:col-span-2 bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <HeartPulse className="w-4 h-4 text-rose-400" />
-                Digital ICE Safety Vault (In Case of Emergency)
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Critical medical and insurance disclosures ready for first responders.
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <HeartPulse className="w-4 h-4 text-rose-400" />
+                  Digital ICE Safety Vault (In Case of Emergency)
+                </h3>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-mono font-bold border border-amber-500/30">
+                  DEMONSTRATION SAMPLE RECORD
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Emergency identity, blood type, and insurance telemetry disclosures prepared for first responders.
               </p>
             </div>
-            <span className="flex items-center gap-1 text-[11px] text-teal-400 font-mono bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
+            <span className="flex items-center gap-1 text-[11px] text-teal-400 font-mono bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20 self-start sm:self-center">
               <Lock className="w-3 h-3" />
               Client Encrypted
+            </span>
+          </div>
+
+          {/* Demonstration Notice */}
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2">
+            <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <span>
+              <strong>Sample Data Notice:</strong> All displayed identity details, blood groups, allergies, and policy numbers are synthetic demonstration test records. Real user identity is never transmitted without explicit authorization.
             </span>
           </div>
 
@@ -449,7 +473,7 @@ export default function SafetyCenterPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
               <span className="text-[10px] text-slate-400 uppercase font-semibold block">Cardholder</span>
-              <span className="font-bold text-white text-xs block mt-0.5">{SAFETY_ICE_VAULT.cardHolder}</span>
+              <span className="font-bold text-white text-xs block mt-0.5">{user?.name || SAFETY_ICE_VAULT.cardHolder}</span>
               <span className="text-[10px] text-slate-400 font-mono">DOB: {SAFETY_ICE_VAULT.dob}</span>
             </div>
 
@@ -546,18 +570,22 @@ export default function SafetyCenterPage() {
             </span>
 
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-              {checkInLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 text-xs space-y-0.5"
-                >
-                  <div className="flex items-center justify-between text-slate-300 font-semibold">
-                    <span className="truncate">{log.location}</span>
-                    <span className="text-[10px] text-teal-400 font-mono">{log.timestamp}</span>
+              {checkInLogs.length === 0 ? (
+                <p className="text-slate-500 text-xs italic py-2">No safety pings broadcast yet. Use the button above to test a ping.</p>
+              ) : (
+                checkInLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 text-xs space-y-0.5"
+                  >
+                    <div className="flex items-center justify-between text-slate-300 font-semibold">
+                      <span className="truncate">{log.location}</span>
+                      <span className="text-[10px] text-teal-400 font-mono">{log.timestamp}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic">"{log.note}"</p>
                   </div>
-                  <p className="text-[11px] text-slate-400 italic">"{log.note}"</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

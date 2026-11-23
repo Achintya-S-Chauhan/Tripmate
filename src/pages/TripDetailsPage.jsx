@@ -448,13 +448,25 @@ export default function TripDetailsPage() {
           {/* Quick Metrics Badges */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
             <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-200">
-              {activeJourney.totalDistanceKm || activeJourney.distanceKm || 0} km
+              {(() => {
+                const num = Number(activeJourney.totalDistanceKm != null ? activeJourney.totalDistanceKm : (activeJourney.distanceKm || 0));
+                return Number.isInteger(num) ? `${num} km` : `${num.toFixed(1)} km`;
+              })()}
             </span>
             <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-teal-400">
-              {activeJourney.totalDurationMinutes || 55} mins
+              {(() => {
+                const totalMins = Number(activeJourney.totalDurationMinutes) || (activeJourney.segments || activeJourney.travelSegments || []).reduce((acc, s) => acc + (parseInt(s.durationMinutes, 10) || 0), 0) || 0;
+                if (totalMins >= 60) {
+                  return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+                }
+                return `${totalMins} mins`;
+              })()}
             </span>
             <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400">
-              -{activeJourney.estimatedCo2Kg || activeJourney.co2SavedKg || 4.2} kg CO₂
+              {(() => {
+                const co2 = Number(activeJourney.estimatedCo2Kg != null ? activeJourney.estimatedCo2Kg : (activeJourney.co2SavedKg || 0));
+                return co2 > 0 ? `-${co2.toFixed(1)} kg CO₂` : `0 kg CO₂`;
+              })()}
             </span>
           </div>
         </div>
@@ -507,11 +519,27 @@ export default function TripDetailsPage() {
             <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
               <InteractiveMap
                 waypoints={activeJourney.waypoints || []}
-                center={activeJourney.center || [35.0116, 135.7681]}
+                center={activeJourney.center || null}
                 zoom={activeJourney.zoom || 13}
                 currentLocation={activeJourney.currentLocation}
                 height="460px"
                 destinationTitle={`${activeJourney.title} — ${activeJourney.destination}`}
+                onLocationSelect={(loc) => {
+                  const newWp = {
+                    id: `wp-${Date.now()}`,
+                    title: loc.name,
+                    coords: [loc.lat, loc.lng],
+                    day: 1,
+                    category: 'waypoint',
+                    notes: loc.displayName,
+                    completed: false,
+                  };
+                  const updatedWaypoints = [...(activeJourney.waypoints || []), newWp];
+                  editJourney(activeJourney.id || activeJourney._id, {
+                    waypoints: updatedWaypoints,
+                    center: [loc.lat, loc.lng],
+                  });
+                }}
               />
             </div>
           ) : (

@@ -105,7 +105,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span className="flex items-center gap-1.5">
             <Database className="w-3.5 h-3.5 text-teal-400" />
-            Database Persistence: {isAuthenticated ? 'MongoDB Atlas (Cluster0)' : 'Browser Local Storage'}
+            Database Persistence: {isAuthenticated ? 'MongoDB Connected' : 'Browser Local Storage'}
           </span>
           <span className="font-mono text-slate-500 text-[11px]">
             Home: {user.homeCity || 'Kyoto, Japan'}

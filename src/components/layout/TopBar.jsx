@@ -101,7 +101,7 @@ export default function TopBar() {
         {isAuthenticated ? (
           <div
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-medium"
-            title={`Connected to MongoDB Atlas as ${user.email}`}
+            title={`Connected to MongoDB as ${user.email}`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
             <span className="hidden md:inline font-mono">Cloud Synced:</span>
@@ -252,7 +252,7 @@ export default function TopBar() {
                 </div>
                 <span className="inline-flex items-center gap-1 mt-1.5 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <Database className="w-2.5 h-2.5" />
-                  {isAuthenticated ? 'MongoDB Atlas Connected' : 'Local Storage Only'}
+                  {isAuthenticated ? 'MongoDB Connected' : 'Local Storage Only'}
                 </span>
               </div>
 

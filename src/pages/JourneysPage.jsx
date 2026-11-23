@@ -17,9 +17,11 @@ import {
   Bike,
   X,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
+import { searchLocation } from '../services/geocoding';
 
 // Helper to get transport mode icon
 function getSegmentIcon(type, mode) {
@@ -194,9 +196,50 @@ export default function JourneysPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!validateCreate()) return;
+
+    // Resolve real geocoded coordinates for origin and destination if available
+    let waypoints = [];
+    let center = null;
+
+    try {
+      const [originMatches, destMatches] = await Promise.all([
+        searchLocation(createForm.origin.trim()),
+        searchLocation(createForm.destination.trim()),
+      ]);
+
+      if (originMatches && originMatches.length > 0) {
+        waypoints.push({
+          id: `wp-${Date.now()}-1`,
+          title: originMatches[0].name || createForm.origin.trim(),
+          category: 'origin',
+          coords: [originMatches[0].lat, originMatches[0].lng],
+          day: 1,
+          time: '09:00 AM',
+          completed: false,
+          isOrigin: true,
+        });
+        center = [originMatches[0].lat, originMatches[0].lng];
+      }
+
+      if (destMatches && destMatches.length > 0) {
+        waypoints.push({
+          id: `wp-${Date.now()}-2`,
+          title: destMatches[0].name || createForm.destination.trim(),
+          category: 'destination',
+          coords: [destMatches[0].lat, destMatches[0].lng],
+          day: 1,
+          time: '10:00 AM',
+          completed: false,
+          isDestination: true,
+        });
+        if (!center) center = [destMatches[0].lat, destMatches[0].lng];
+      }
+    } catch {
+      // Continue without geocoded waypoints if offline
+    }
 
     createJourney({
       title: createForm.title.trim() || `${createForm.origin} ➔ ${createForm.destination}`,
@@ -209,6 +252,8 @@ export default function JourneysPage() {
       totalDurationMinutes: parseInt(createForm.totalDurationMinutes, 10) || 0,
       summary: createForm.summary.trim() || `Multi-modal structured trip chain from ${createForm.origin} to ${createForm.destination}.`,
       transitLine: createForm.transitLine.trim() || null,
+      waypoints: waypoints.length > 0 ? waypoints : undefined,
+      center: center || undefined,
     });
 
     setIsCreateOpen(false);
@@ -292,9 +337,11 @@ export default function JourneysPage() {
   const formatDist = (km) => {
     const num = Number(km) || 0;
     if (settings?.distanceUnit === 'mi') {
-      return `${Math.round(num * 0.621371)} mi`;
+      const mi = (num * 0.621371).toFixed(1);
+      return `${Number(mi).toLocaleString()} mi`;
     }
-    return `${num} km`;
+    const cleanKm = Number.isInteger(num) ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return `${cleanKm} km`;
   };
 
   return (
@@ -405,30 +452,36 @@ export default function JourneysPage() {
       {/* Journeys Cards Grid or Empty State */}
       {filteredJourneys.length === 0 ? (
         <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-12 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400">
-            <Compass className="w-8 h-8 text-teal-400" />
+          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-teal-400">
+            <Compass className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">No Matching Journeys Found</h3>
+            <h3 className="text-lg font-bold text-white">
+              {journeys.length === 0 ? 'No Journeys Planned Yet' : 'No Matching Journeys Found'}
+            </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              We couldn't find any trips matching your current search or filters. Try adjusting your query.
+              {journeys.length === 0
+                ? 'Create your first expedition to start tracking multi-modal routes, waypoints, and carbon efficiency on real maps.'
+                : "We couldn't find any trips matching your current search or filters. Try adjusting your query."}
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition"
-            >
-              Reset Filters
-            </button>
+            {journeys.length > 0 && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition"
+              >
+                Reset Filters
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Create Journey</span>
+              <span>{journeys.length === 0 ? 'Plan Your First Journey' : 'Create Journey'}</span>
             </button>
           </div>
         </div>
@@ -520,12 +573,18 @@ export default function JourneysPage() {
                     <span className="text-slate-200 font-semibold">{formatDist(dist)}</span>
                     <span>•</span>
                     <span>{segments.length} {segments.length === 1 ? 'Leg' : 'Legs'}</span>
-                    {journey.co2SavedKg && (
-                      <>
-                        <span>•</span>
-                        <span className="text-emerald-400">-{journey.co2SavedKg} kg CO₂</span>
-                      </>
-                    )}
+                    {(() => {
+                      const co2Val = Number(journey.estimatedCo2Kg != null ? journey.estimatedCo2Kg : journey.co2SavedKg);
+                      if (co2Val != null && !isNaN(co2Val) && co2Val > 0) {
+                        return (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-400">-{co2Val.toFixed(1)} kg CO₂</span>
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <span className="text-teal-400 text-xs font-bold group-hover:translate-x-1 transition flex items-center gap-1">

@@ -159,25 +159,12 @@ export const createJourney = async (req, res, next) => {
       summary: summary || '',
       budget: parseFloat(budget) || 0,
       spent: 0,
+      center: req.body.center || (waypoints && waypoints[0]?.coords) || [20, 0],
+      zoom: req.body.zoom || (waypoints && waypoints.length > 0 ? 12 : 2),
       coverImage:
         coverImage ||
         'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
-      waypoints: waypoints || [
-        {
-          id: `wp-${Date.now()}-1`,
-          title: origin,
-          coords: [35.0116, 135.7681],
-          completed: false,
-          isOrigin: true,
-        },
-        {
-          id: `wp-${Date.now()}-2`,
-          title: destination,
-          coords: [35.0216, 135.7781],
-          completed: false,
-          isDestination: true,
-        },
-      ],
+      waypoints: Array.isArray(waypoints) ? waypoints : [],
       segments: initialSegments,
       travelSegments: initialSegments,
     });
@@ -250,6 +237,8 @@ export const updateJourney = async (req, res, next) => {
     if (expenses) journey.expenses = expenses;
     if (hotelInfo) journey.hotelInfo = hotelInfo;
     if (currentLocation) journey.currentLocation = currentLocation;
+    if (req.body.center) journey.center = req.body.center;
+    if (req.body.zoom) journey.zoom = req.body.zoom;
 
     const newSegs = segments || travelSegments;
     if (Array.isArray(newSegs)) {

@@ -304,8 +304,8 @@ export default function TravelInsightsPage() {
     const dateMap = {};
 
     filteredJourneys.forEach((j) => {
-      const jDist = parseFloat(j.totalDistanceKm) || 0;
-      const jDur = parseInt(j.totalDurationMinutes, 10) || 0;
+      const jDist = parseFloat(j.totalDistanceKm != null ? j.totalDistanceKm : j.distanceKm) || 0;
+      const jDur = parseInt(j.totalDurationMinutes != null ? j.totalDurationMinutes : j.durationMinutes, 10) || 0;
       totalDistKm += jDist;
       totalDurMins += jDur;
 

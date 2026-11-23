@@ -55,8 +55,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
   const dbStatus = getDbStatus();
-  res.status(200).json({
-    status: 'healthy',
+  const statusCode = dbStatus.isConnected ? 200 : 503;
+  res.status(statusCode).json({
+    status: dbStatus.isConnected ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
     database: dbStatus,

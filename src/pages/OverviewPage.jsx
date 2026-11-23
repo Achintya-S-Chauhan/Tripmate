@@ -50,10 +50,11 @@ export default function OverviewPage() {
   const formatDistance = (km) => {
     const num = Number(km) || 0;
     if (settings.distanceUnit === 'mi') {
-      const mi = Math.round(num * 0.621371);
-      return `${mi.toLocaleString()} mi`;
+      const mi = (num * 0.621371).toFixed(1);
+      return `${Number(mi).toLocaleString()} mi`;
     }
-    return `${num.toLocaleString()} km`;
+    const cleanKm = Number.isInteger(num) ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return `${cleanKm} km`;
   };
 
   // Transport mode icon helper
@@ -73,47 +74,84 @@ export default function OverviewPage() {
     }
   };
 
-  // Derive aggregate metrics from real journeys data or summaryStats fallback
+  // Derive aggregate metrics strictly from authenticated user's actual journey data
   const calculatedMetrics = useMemo(() => {
     if (!journeys || journeys.length === 0) {
       return {
-        totalDistanceKm: summaryStats?.totalDistanceKm || 0,
-        totalHours: summaryStats?.totalTravelTimeHours || 0,
-        totalCo2Saved: summaryStats?.totalCo2SavedKg || 0,
+        totalDistanceKm: 0,
+        totalHours: 0,
+        totalCo2Saved: 0,
+        completedCount: 0,
+        inProgressCount: 0,
+        upcomingCount: 0,
+        draftCount: 0,
       };
     }
 
     let dist = 0;
+    let durMinutes = 0;
     let co2 = 0;
+    let completed = 0;
+    let inProgress = 0;
+    let upcoming = 0;
+    let draft = 0;
+
     journeys.forEach((j) => {
-      dist += Number(j.distanceKm) || 0;
-      co2 += Number(j.co2SavedKg) || 0;
+      const jDist = Number(j.totalDistanceKm != null ? j.totalDistanceKm : j.distanceKm) || 0;
+      const jDur = Number(j.totalDurationMinutes != null ? j.totalDurationMinutes : j.durationMinutes) || 0;
+      const jCo2 = Number(j.estimatedCo2Kg != null ? j.estimatedCo2Kg : j.co2SavedKg) || (jDist * 0.18);
+
+      dist += jDist;
+      durMinutes += jDur;
+      co2 += jCo2;
+
+      const status = (j.status || '').toLowerCase();
+      if (status === 'completed') completed++;
+      else if (status === 'in progress' || status === 'in_progress' || status === 'active') inProgress++;
+      else if (status === 'draft') draft++;
+      else upcoming++;
     });
 
-    // If journey list has non-zero sums, use them; otherwise fall back to summaryStats
-    const finalDist = dist > 0 ? dist : summaryStats?.totalDistanceKm || 0;
-    const finalCo2 = co2 > 0 ? co2 : summaryStats?.totalCo2SavedKg || 0;
-    const finalHours = summaryStats?.totalTravelTimeHours || 48.7;
-
     return {
-      totalDistanceKm: finalDist,
-      totalHours: finalHours,
-      totalCo2Saved: finalCo2,
+      totalDistanceKm: parseFloat(dist.toFixed(1)),
+      totalHours: parseFloat((durMinutes / 60).toFixed(1)),
+      totalCo2Saved: parseFloat(co2.toFixed(1)),
+      completedCount: completed,
+      inProgressCount: inProgress,
+      upcomingCount: upcoming,
+      draftCount: draft,
     };
-  }, [journeys, summaryStats]);
+  }, [journeys]);
 
-  const travelSegments = activeJourney?.travelSegments || [];
+  const travelSegments = activeJourney?.segments || activeJourney?.travelSegments || [];
   const currentSegmentIndex = journeyLiveState?.activeSegmentIndex || 0;
-  const isJourneyActive = journeyLiveState?.status === 'in_progress';
+
+  const isJourneyActive = Boolean(
+    activeJourney && (
+      activeJourney.status === 'In Progress' ||
+      activeJourney.status === 'in_progress' ||
+      activeJourney.status === 'Active' ||
+      (journeyLiveState?.status === 'in_progress' &&
+        (journeyLiveState?.journeyId === activeJourney.id || journeyLiveState?.journeyId === activeJourney._id))
+    )
+  );
+
+  const isJourneyCompleted = Boolean(
+    activeJourney &&
+      !isJourneyActive &&
+      (activeJourney.status === 'Completed' || activeJourney.status === 'completed')
+  );
+
   const currentLeg = travelSegments[currentSegmentIndex] || travelSegments[0];
 
   // Calculate percentage of journey completed
   const progressPercent = useMemo(() => {
     if (!travelSegments.length) return 0;
-    if (!isJourneyActive) return 0;
+    if (isJourneyCompleted) return 100;
+    if (!isJourneyActive) return 0; // Standby journeys must show 0%
     const completedFraction = (currentSegmentIndex + 0.5) / travelSegments.length;
-    return Math.min(100, Math.round(completedFraction * 100));
-  }, [travelSegments, currentSegmentIndex, isJourneyActive]);
+    return Math.min(95, Math.max(5, Math.round(completedFraction * 100)));
+  }, [travelSegments, currentSegmentIndex, isJourneyActive, isJourneyCompleted]);
 
   // Upcoming and recent journeys preview (up to 3 items)
   const recentList = useMemo(() => {
@@ -156,10 +194,19 @@ export default function OverviewPage() {
                 <span>End Journey</span>
               </button>
             </>
+          ) : activeJourney && isJourneyCompleted ? (
+            <button
+              type="button"
+              onClick={() => navigateToJourney(activeJourney.id || activeJourney._id)}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 font-semibold text-xs transition flex items-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5 text-teal-400" />
+              <span>Completed Expedition</span>
+            </button>
           ) : activeJourney ? (
             <button
               type="button"
-              onClick={() => startJourney(activeJourney.id)}
+              onClick={() => startJourney(activeJourney.id || activeJourney._id)}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-black text-xs sm:text-sm tracking-wide transition flex items-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95"
             >
               <Play className="w-4 h-4 fill-current" />
@@ -192,15 +239,17 @@ export default function OverviewPage() {
                   className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border ${
                     isJourneyActive
                       ? 'bg-teal-500/15 border-teal-500/30 text-teal-300 shadow-sm'
+                      : isJourneyCompleted
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                       : 'bg-slate-800 text-slate-300 border-slate-700'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isJourneyActive ? 'bg-teal-400 animate-pulse' : 'bg-slate-400'
+                      isJourneyActive ? 'bg-teal-400 animate-pulse' : isJourneyCompleted ? 'bg-emerald-400' : 'bg-slate-400'
                     }`}
                   />
-                  {isJourneyActive ? 'Live In Progress' : 'Ready to Depart'}
+                  {isJourneyActive ? 'Live In Progress' : isJourneyCompleted ? 'Completed' : 'Ready to Depart'}
                 </span>
 
                 <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
@@ -217,7 +266,7 @@ export default function OverviewPage() {
 
               <button
                 type="button"
-                onClick={() => navigateToJourney(activeJourney.id)}
+                onClick={() => navigateToJourney(activeJourney.id || activeJourney._id)}
                 className="text-xs font-bold text-teal-400 hover:text-teal-300 transition flex items-center gap-1 self-start sm:self-auto"
               >
                 <span>View Route & Details</span>
@@ -232,9 +281,9 @@ export default function OverviewPage() {
                   {activeJourney.title}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  {user.homeCity || 'Origin'} ➔ {activeJourney.destination}
+                  {activeJourney.origin || activeJourney.waypoints?.[0]?.title || 'Origin'} ➔ {activeJourney.destination}
                   <span className="text-slate-500 ml-2 font-mono">
-                    ({formatDistance(activeJourney.distanceKm || 38.9)} total)
+                    ({formatDistance(activeJourney.totalDistanceKm != null ? activeJourney.totalDistanceKm : (activeJourney.distanceKm || 0))} total)
                   </span>
                 </p>
               </div>
@@ -244,7 +293,7 @@ export default function OverviewPage() {
                 <div className="text-right">
                   <span className="text-xs text-slate-400 block">Trip Chain Progress</span>
                   <span className="text-lg font-mono font-bold text-teal-400">
-                    {isJourneyActive ? `${progressPercent}%` : 'Standby'}
+                    {isJourneyActive ? `${progressPercent}%` : isJourneyCompleted ? '100%' : 'Standby (0%)'}
                   </span>
                 </div>
               )}
@@ -264,12 +313,14 @@ export default function OverviewPage() {
                 {currentLeg && (
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span className="flex items-center gap-1.5 text-slate-300">
-                      {getModeIcon(currentLeg.modeType)}
+                      {getModeIcon(currentLeg.modeType || currentLeg.type)}
                       <strong className="text-white">
-                        Leg {currentSegmentIndex + 1} of {travelSegments.length}:
+                        {isJourneyCompleted
+                          ? `All ${travelSegments.length} legs finalized`
+                          : `Leg ${currentSegmentIndex + 1} of ${travelSegments.length}:`}
                       </strong>
                       <span>
-                        {currentLeg.from} ➔ {currentLeg.to}
+                        {currentLeg.from || currentLeg.origin} ➔ {currentLeg.to || currentLeg.destination}
                       </span>
                     </span>
 
@@ -315,7 +366,7 @@ export default function OverviewPage() {
             {formatDistance(calculatedMetrics.totalDistanceKm)}
           </div>
           <div className="text-[11px] text-cyan-400/90 mt-2 flex items-center justify-between">
-            <span>84% low-emission rail transit</span>
+            <span>{calculatedMetrics.inProgressCount} in progress • {calculatedMetrics.completedCount} completed</span>
             <span className="text-slate-500 group-hover:text-cyan-300 transition">Insights →</span>
           </div>
         </div>
@@ -336,7 +387,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-[11px] text-emerald-400/90 mt-2 flex items-center justify-between">
-            <span>Avg 3h 45m per journey</span>
+            <span>{journeys.length} total expedition{journeys.length === 1 ? '' : 's'}</span>
             <span className="text-slate-500 group-hover:text-emerald-300 transition">Insights →</span>
           </div>
         </div>
@@ -351,11 +402,11 @@ export default function OverviewPage() {
             <Leaf className="w-4 h-4 text-teal-400 group-hover:scale-110 transition-transform" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-            {calculatedMetrics.totalCo2Saved}{' '}
+            {calculatedMetrics.totalCo2Saved.toFixed(1)}{' '}
             <span className="text-base font-normal text-slate-400">kg CO₂</span>
           </div>
           <div className="text-[11px] text-teal-400/90 mt-2 flex items-center justify-between">
-            <span>Calculated vs. short flights</span>
+            <span>Calculated vs. car baseline</span>
             <span className="text-slate-500 group-hover:text-teal-300 transition">Details →</span>
           </div>
         </div>
@@ -388,48 +439,54 @@ export default function OverviewPage() {
 
           {recentList.length > 0 ? (
             <div className="space-y-2.5">
-              {recentList.map((j) => (
-                <div
-                  key={j.id || j._id}
-                  onClick={() => navigateToJourney(j.id || j._id)}
-                  className="p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/80 hover:border-teal-500/30 transition cursor-pointer flex items-center justify-between gap-3 group"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-xs sm:text-sm group-hover:text-teal-300 transition truncate">
-                        {j.title}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                          j.status === 'active' || (activeJourney?.id === j.id && isJourneyActive)
-                            ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
-                            : j.status === 'completed'
-                            ? 'bg-slate-800 text-slate-400'
-                            : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                        }`}
-                      >
-                        {j.status || 'Planned'}
-                      </span>
+              {recentList.map((j) => {
+                const jDist = Number(j.totalDistanceKm != null ? j.totalDistanceKm : (j.distanceKm || 0));
+                const jCo2 = Number(j.estimatedCo2Kg != null ? j.estimatedCo2Kg : j.co2SavedKg);
+                const isCurrentLive = (activeJourney?.id === j.id || activeJourney?._id === j._id) && isJourneyActive;
+
+                return (
+                  <div
+                    key={j.id || j._id}
+                    onClick={() => navigateToJourney(j.id || j._id)}
+                    className="p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/80 hover:border-teal-500/30 transition cursor-pointer flex items-center justify-between gap-3 group"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-xs sm:text-sm group-hover:text-teal-300 transition truncate">
+                          {j.title}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                            isCurrentLive || j.status === 'In Progress' || j.status === 'Active'
+                              ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
+                              : j.status === 'Completed' || j.status === 'completed'
+                              ? 'bg-slate-800 text-slate-400'
+                              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                        >
+                          {j.status || 'Planned'}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                        <span>{j.destination}</span>
+                        <span>•</span>
+                        <span className="font-mono">{formatDistance(jDist)}</span>
+                        {jCo2 != null && !isNaN(jCo2) && (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-400 font-mono">
+                              -{jCo2.toFixed(1)} kg CO₂
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                      <span>{j.destination}</span>
-                      <span>•</span>
-                      <span className="font-mono">{formatDistance(j.distanceKm || 38.9)}</span>
-                      {j.co2SavedKg && (
-                        <>
-                          <span>•</span>
-                          <span className="text-emerald-400 font-mono">
-                            -{j.co2SavedKg} kg CO₂
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-0.5 transition shrink-0" />
                   </div>
-
-                  <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-0.5 transition shrink-0" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-6 text-slate-400 text-xs">
@@ -444,11 +501,11 @@ export default function OverviewPage() {
             <div className="border-b border-slate-800 pb-3">
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 mb-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Safety Hub Active
+                Safety & Readiness Hub
               </span>
               <h3 className="text-sm font-bold text-white">Emergency Readiness</h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Verified travel safety protections and emergency channels.
+                Simulated emergency readiness tools, local 112 emergency reference, and trusted contacts management.
               </p>
             </div>
 
@@ -468,9 +525,9 @@ export default function OverviewPage() {
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                <span className="text-slate-300">Local Emergency Numbers</span>
+                <span className="text-slate-300">Unified Emergency Line</span>
                 <span className="font-mono font-bold text-white">
-                  110 (Police) • 119 (Medical)
+                  112 (India ERSS / National Unified)
                 </span>
               </div>
             </div>

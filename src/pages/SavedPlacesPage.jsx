@@ -20,10 +20,12 @@ import {
   AlertTriangle,
   Sparkles,
   Info,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import InteractiveMap from '../components/map/InteractiveMap';
+import { searchLocation } from '../services/geocoding';
 
 export default function SavedPlacesPage() {
   const {
@@ -46,20 +48,25 @@ export default function SavedPlacesPage() {
   const [deletingPlace, setDeletingPlace] = useState(null);
   const [formError, setFormError] = useState('');
 
+  // Geocoding helper in Add Modal
+  const [geoSearchQuery, setGeoSearchQuery] = useState('');
+  const [geoSearchResults, setGeoSearchResults] = useState([]);
+  const [isGeoSearching, setIsGeoSearching] = useState(false);
+
   // New place / safe zone form state
   const [newPlace, setNewPlace] = useState({
     name: '',
     category: 'Hotel',
-    city: 'Kyoto',
-    country: 'Japan',
+    city: '',
+    country: '',
     address: '',
     rating: '4.8',
     hours: '24/7 Access',
     tags: 'Safe Haven, Concierge',
     notes: '',
     radiusMeters: 250,
-    lat: '35.0037',
-    lng: '135.7770',
+    lat: '',
+    lng: '',
     imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80',
     isMustVisit: true,
   });
@@ -144,19 +151,49 @@ export default function SavedPlacesPage() {
     setNewPlace({
       name: '',
       category: 'Hotel',
-      city: 'Kyoto',
-      country: 'Japan',
+      city: '',
+      country: '',
       address: '',
       rating: '4.8',
       hours: '24/7 Access',
       tags: 'Safe Haven, Concierge',
       notes: '',
       radiusMeters: 250,
-      lat: '35.0037',
-      lng: '135.7770',
+      lat: '',
+      lng: '',
       imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80',
       isMustVisit: true,
     });
+    setGeoSearchQuery('');
+    setGeoSearchResults([]);
+  };
+
+  const handleGeoSearch = async (e) => {
+    e?.preventDefault();
+    if (!geoSearchQuery.trim()) return;
+    setIsGeoSearching(true);
+    try {
+      const results = await searchLocation(geoSearchQuery);
+      setGeoSearchResults(results);
+    } catch {
+      setGeoSearchResults([]);
+    } finally {
+      setIsGeoSearching(false);
+    }
+  };
+
+  const handleSelectGeoResult = (result) => {
+    setNewPlace((prev) => ({
+      ...prev,
+      name: prev.name || result.name,
+      lat: result.lat.toString(),
+      lng: result.lng.toString(),
+      address: result.displayName,
+      city: result.city || prev.city,
+      country: result.country || prev.country,
+    }));
+    setGeoSearchQuery(result.name);
+    setGeoSearchResults([]);
   };
 
   const applyCoordPreset = (preset) => {
@@ -218,14 +255,21 @@ export default function SavedPlacesPage() {
           waypoints={[]}
           savedZones={savedPlaces}
           onSimulateGeofence={simulateGeofenceEvent}
-          center={[35.008, 135.765]}
-          zoom={13}
+          center={null}
           height="400px"
-          destinationTitle="Kyoto Safe Havens & Geofenced Safe Zones"
-          currentLocation={{
-            name: 'Gion District Base, Kyoto',
-            coords: [35.0037, 135.7770],
-            updatedAgo: 'Just now (Simulated)',
+          destinationTitle="Curated Safe Havens & Geofenced Safe Zones"
+          currentLocation={null}
+          onLocationSelect={(loc) => {
+            setNewPlace((prev) => ({
+              ...prev,
+              name: prev.name || loc.name,
+              lat: loc.lat.toString(),
+              lng: loc.lng.toString(),
+              address: loc.displayName,
+              city: loc.city || prev.city,
+              country: loc.country || prev.country,
+            }));
+            setIsAddModalOpen(true);
           }}
         />
       </div>
@@ -278,8 +322,36 @@ export default function SavedPlacesPage() {
       </div>
 
       {/* 3. PLACES & SAFE ZONES CARDS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPlaces.map((place) => {
+      {filteredPlaces.length === 0 ? (
+        <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-teal-400">
+            <Bookmark className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              {savedPlaces.length === 0 ? 'No Saved Safe Zones Yet' : 'No Safe Zones Match Filters'}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+              {savedPlaces.length === 0
+                ? 'Add hotels, transit terminals, or consular checkpoints to establish geofenced safe perimeters on your real map.'
+                : 'Try clearing your category or radius filters to see all saved places.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFormError('');
+              setIsAddModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition inline-flex items-center gap-1.5 shadow-lg shadow-teal-500/20"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Add Safe Zone</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPlaces.map((place) => {
           const isInside = place.currentStatus === 'inside';
           const radius = place.radiusMeters || 250;
 
@@ -434,7 +506,8 @@ export default function SavedPlacesPage() {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* 4. CHRONOLOGICAL GEOFENCE EVENT HISTORY LOG */}
       <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
@@ -574,6 +647,55 @@ export default function SavedPlacesPage() {
                   <option value={1000}>1,000m (District Perimeter)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Real OpenStreetMap Location Search & Geocoding */}
+            <div className="bg-slate-900/80 p-3 rounded-xl border border-teal-500/30 space-y-2">
+              <label className="block text-xs font-bold text-teal-300">
+                🔍 Search Location & Auto-Resolve Coordinates (OpenStreetMap)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={geoSearchQuery}
+                  onChange={(e) => setGeoSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleGeoSearch(e);
+                    }
+                  }}
+                  placeholder="Enter city, landmark, or address (e.g. Kyoto Station, Eiffel Tower)..."
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleGeoSearch}
+                  disabled={isGeoSearching}
+                  className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition flex items-center gap-1 shrink-0"
+                >
+                  {isGeoSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                  <span>Find Coords</span>
+                </button>
+              </div>
+
+              {geoSearchResults.length > 0 && (
+                <div className="space-y-1 pt-1 max-h-36 overflow-y-auto">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">Select Resolved Location:</div>
+                  {geoSearchResults.map((res) => (
+                    <button
+                      key={res.id}
+                      type="button"
+                      onClick={() => handleSelectGeoResult(res)}
+                      className="w-full text-left p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs transition flex flex-col gap-0.5 group"
+                    >
+                      <span className="font-bold text-white group-hover:text-teal-300">{res.name}</span>
+                      <span className="text-[10px] text-slate-400 truncate">{res.displayName}</span>
+                      <span className="text-[9px] font-mono text-teal-400">Lat: {res.lat.toFixed(4)}, Lng: {res.lng.toFixed(4)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Coordinate Presets */}

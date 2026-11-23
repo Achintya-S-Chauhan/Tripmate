@@ -39,7 +39,7 @@ function MainApp() {
   const {
     activePage,
     setActivePage,
-    setIsDemoMode,
+    enterDemoMode,
     isAuthModalOpen,
     closeAuthModal,
     openAuthModal,
@@ -51,10 +51,7 @@ function MainApp() {
       <>
         <LandingPage
           onOpenAuth={(mode) => openAuthModal(mode)}
-          onEnterDemo={() => {
-            setIsDemoMode(true);
-            setActivePage('overview');
-          }}
+          onEnterDemo={enterDemoMode}
         />
         <AuthModal
           isOpen={isAuthModalOpen}

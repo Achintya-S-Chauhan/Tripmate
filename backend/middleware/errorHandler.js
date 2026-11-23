@@ -38,6 +38,15 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ success: false, message: 'Authentication session expired. Please sign in again.' });
   }
 
+  // Mongoose server selection / connectivity error
+  if (err.name === 'MongooseServerSelectionError' || err.name === 'MongoServerSelectionError') {
+    return res.status(503).json({
+      success: false,
+      message: 'Database unavailable. Could not connect to MongoDB. Please ensure MongoDB is running on port 27017 or check database configuration.',
+      error: err.message,
+    });
+  }
+
   // Default server error
   res.status(error.statusCode || 500).json({
     success: false,

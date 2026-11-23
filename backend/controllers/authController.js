@@ -308,8 +308,8 @@ export const register = async (req, res, next) => {
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
     });
 
-    // Populate initial starter records for presentation readiness
-    await seedUserData(user._id);
+    // User created with clean initial state - no mock records seeded
+    // Newly registered accounts start with an empty database
 
     // Issue JWT
     const token = generateToken(user._id);

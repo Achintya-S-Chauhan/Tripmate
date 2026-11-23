@@ -39,7 +39,9 @@ export function AppProvider({ children }) {
     } catch {}
     return getToken() ? 'overview' : 'landing';
   });
-  const [activeJourneyId, setActiveJourneyId] = useState('journey-campus-commute');
+  const [activeJourneyId, setActiveJourneyId] = useState(() => {
+    return getToken() ? '' : 'journey-campus-commute';
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -81,7 +83,9 @@ export function AppProvider({ children }) {
   }, [activePage]);
 
   // User Profile
-  const [user, setUser] = useState(INITIAL_USER);
+  const [user, setUser] = useState(() => {
+    return getToken() ? { name: 'Traveler', email: '', homeCity: '' } : INITIAL_USER;
+  });
 
   // Settings
   const [settings, setSettings] = useState(() => {
@@ -97,17 +101,12 @@ export function AppProvider({ children }) {
 
   // Journeys
   const [journeys, setJourneys] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.JOURNEYS);
       if (!saved) return INITIAL_JOURNEYS;
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_JOURNEYS;
-      // Ensure campus commute exists
-      const hasCampus = parsed.some((j) => j && j.id === 'journey-campus-commute');
-      if (!hasCampus) {
-        const campus = INITIAL_JOURNEYS.find((j) => j.id === 'journey-campus-commute');
-        if (campus) return [campus, ...parsed];
-      }
       return parsed;
     } catch {
       return INITIAL_JOURNEYS;
@@ -116,6 +115,7 @@ export function AppProvider({ children }) {
 
   // Saved Places
   const [savedPlaces, setSavedPlaces] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SAVED_PLACES);
       if (!saved) return INITIAL_SAVED_PLACES;
@@ -128,6 +128,7 @@ export function AppProvider({ children }) {
 
   // Check-ins & SOS Logs
   const [checkInLogs, setCheckInLogs] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CHECK_INS);
       if (!saved) return [
@@ -168,6 +169,7 @@ export function AppProvider({ children }) {
 
   // Overview Summary Statistics
   const [summaryStats, setSummaryStats] = useState(() => {
+    if (getToken()) return { totalDistanceKm: 0, totalDurationHours: 0, totalCo2Kg: 0, journeysCompleted: 0 };
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SUMMARY_STATS);
       if (!saved) return INITIAL_SUMMARY_STATS;
@@ -180,6 +182,7 @@ export function AppProvider({ children }) {
 
   // Recent Journeys Log
   const [recentJourneys, setRecentJourneys] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.RECENT_JOURNEYS);
       if (!saved) return INITIAL_RECENT_JOURNEYS;
@@ -192,6 +195,7 @@ export function AppProvider({ children }) {
 
   // Active / Live Journey State
   const [journeyLiveState, setJourneyLiveState] = useState(() => {
+    if (getToken()) return { status: 'idle', activeSegmentIndex: 0, journeyId: null };
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.LIVE_STATE);
       if (!saved) return {
@@ -200,7 +204,7 @@ export function AppProvider({ children }) {
         startedDate: '2026-10-28',
         activeSegmentIndex: 1, // Segment 2 is active
         elapsedMinutes: 145,
-        journeyId: 'kyoto-2026',
+        journeyId: 'journey-campus-commute',
       };
       const parsed = JSON.parse(saved);
       return parsed && typeof parsed === 'object' ? parsed : {
@@ -209,7 +213,7 @@ export function AppProvider({ children }) {
         startedDate: '2026-10-28',
         activeSegmentIndex: 1,
         elapsedMinutes: 145,
-        journeyId: 'kyoto-2026',
+        journeyId: 'journey-campus-commute',
       };
     } catch {
       return {
@@ -218,13 +222,14 @@ export function AppProvider({ children }) {
         startedDate: '2026-10-28',
         activeSegmentIndex: 1,
         elapsedMinutes: 145,
-        journeyId: 'kyoto-2026',
+        journeyId: 'journey-campus-commute',
       };
     }
   });
 
   // Trusted Contacts Management
   const [trustedContacts, setTrustedContacts] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.TRUSTED_CONTACTS);
       if (!saved) return INITIAL_TRUSTED_CONTACTS;
@@ -468,10 +473,42 @@ export function AppProvider({ children }) {
 
       if (Array.isArray(journeysRes?.journeys)) {
         setJourneys(journeysRes.journeys);
-        if (journeysRes.journeys.length > 0) {
+
+        // Check if user has an actively underway journey in Atlas
+        const inProgressJourney = journeysRes.journeys.find(
+          (j) => j.status === 'In Progress' || j.status === 'in_progress' || j.status === 'Active'
+        );
+
+        if (inProgressJourney) {
+          const jId = inProgressJourney.id || inProgressJourney._id;
+          setActiveJourneyId(jId);
+          const segments = inProgressJourney.segments || inProgressJourney.travelSegments || [];
+          const activeIdx = segments.findIndex(
+            (s) => s.status === 'In Progress' || s.status === 'in_progress'
+          );
+          setJourneyLiveState({
+            status: 'in_progress',
+            startTime: segments[0]?.startTime || '09:00 AM',
+            startedDate: inProgressJourney.travelDate || inProgressJourney.startDate || new Date().toISOString().split('T')[0],
+            activeSegmentIndex: activeIdx >= 0 ? activeIdx : 0,
+            elapsedMinutes: 30,
+            journeyId: jId,
+          });
+        } else if (journeysRes.journeys.length > 0) {
           setActiveJourneyId(journeysRes.journeys[0].id || journeysRes.journeys[0]._id);
+          // Set live tracking to idle if no journey is actually in progress
+          setJourneyLiveState((prev) => {
+            if (prev?.status === 'in_progress') {
+              const matched = journeysRes.journeys.find((j) => (j.id || j._id) === prev.journeyId);
+              if (!matched || (matched.status !== 'In Progress' && matched.status !== 'in_progress' && matched.status !== 'Active')) {
+                return { status: 'idle', activeSegmentIndex: 0, journeyId: null };
+              }
+            }
+            return prev;
+          });
         } else {
           setActiveJourneyId('');
+          setJourneyLiveState({ status: 'idle', activeSegmentIndex: 0, journeyId: null });
         }
       }
       if (Array.isArray(placesRes?.places)) {
@@ -491,9 +528,18 @@ export function AppProvider({ children }) {
 
     api.health
       .check()
-      .then(() => {
+      .then((healthRes) => {
         if (!mounted) return;
-        setIsBackendConnected(true);
+        const dbConnected = healthRes?.database?.isConnected ?? true;
+        setIsBackendConnected(dbConnected);
+
+        if (!dbConnected) {
+          addToast(
+            'Database Disconnected',
+            'Backend server is reachable, but MongoDB is disconnected. Please start local MongoDB.',
+            'warning'
+          );
+        }
 
         // If a JWT token exists in localStorage, verify session
         const token = getToken();
@@ -546,6 +592,10 @@ export function AppProvider({ children }) {
         setUser(res.user);
         setIsAuthenticated(true);
         setIsDemoMode(false);
+        // Reset local safety logs to isolate user account
+        setCheckInLogs([]);
+        setSosLogs([]);
+        setEmergencySession(DEFAULT_EMERGENCY_SESSION);
         await fetchCloudData();
         setActivePage('overview');
         return res;
@@ -564,6 +614,10 @@ export function AppProvider({ children }) {
         setUser(res.user);
         setIsAuthenticated(true);
         setIsDemoMode(false);
+        // Reset local safety logs to isolate user account
+        setCheckInLogs([]);
+        setSosLogs([]);
+        setEmergencySession(DEFAULT_EMERGENCY_SESSION);
         await fetchCloudData();
         setActivePage('overview');
         return res;
@@ -577,17 +631,70 @@ export function AppProvider({ children }) {
     api.auth.logout();
     setIsAuthenticated(false);
     setIsDemoMode(false);
+    setUser({ name: 'Traveler', email: '', homeCity: '' });
+    setJourneys([]);
+    setSavedPlaces([]);
+    setTrustedContacts([]);
+    setSummaryStats({ totalDistanceKm: 0, totalDurationHours: 0, totalCo2Kg: 0, journeysCompleted: 0 });
+    setRecentJourneys([]);
+    setCheckInLogs([]);
+    setSosLogs([]);
+    setEmergencySession(DEFAULT_EMERGENCY_SESSION);
+    setJourneyLiveState({ status: 'idle', activeSegmentIndex: 0, journeyId: null });
+    setActiveJourneyId('');
+    setActivePage('landing');
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CHECK_INS);
+      localStorage.removeItem(STORAGE_KEYS.SOS_LOGS);
+      localStorage.removeItem(STORAGE_KEYS.EMERGENCY_SESSION);
+      localStorage.removeItem(STORAGE_KEYS.LIVE_STATE);
+    } catch {}
+    addToast('Signed Out', 'You have been signed out of your cloud account.', 'info');
+  };
+
+  // Explicit Guest Demo Mode initialization
+  const enterDemoMode = () => {
+    setIsDemoMode(true);
+    setIsAuthenticated(false);
     setUser(INITIAL_USER);
     setJourneys(INITIAL_JOURNEYS);
     setSavedPlaces(INITIAL_SAVED_PLACES);
     setTrustedContacts(INITIAL_TRUSTED_CONTACTS);
+    setSummaryStats(INITIAL_SUMMARY_STATS);
+    setRecentJourneys(INITIAL_RECENT_JOURNEYS);
+    setCheckInLogs([
+      {
+        id: 'chk-1',
+        timestamp: 'Today, 10:15 AM',
+        location: 'Gion District, Kyoto',
+        status: 'Safe & Active',
+        note: 'Checked in at Shirakawa Canal bridge. Battery 88%.',
+        battery: '88%',
+      },
+      {
+        id: 'chk-2',
+        timestamp: 'Yesterday, 07:30 PM',
+        location: 'Kiyomizu-dera, Kyoto',
+        status: 'Safe & Active',
+        note: 'Evening temple illumination finished. Heading to dinner.',
+        battery: '74%',
+      },
+    ]);
     setActiveJourneyId('journey-campus-commute');
-    setActivePage('landing');
-    addToast('Signed Out', 'You have been signed out of your cloud account.', 'info');
+    setJourneyLiveState({
+      status: 'in_progress',
+      startTime: '09:15 AM',
+      startedDate: '2026-10-28',
+      activeSegmentIndex: 1,
+      elapsedMinutes: 145,
+      journeyId: 'journey-campus-commute',
+    });
+    setActivePage('overview');
   };
 
   // Active journey helper
-  const activeJourney = journeys.find((j) => j.id === activeJourneyId) || journeys[0];
+  const activeJourney =
+    journeys.find((j) => (j.id || j._id) === activeJourneyId) || journeys[0] || null;
 
   const navigateToJourney = (journeyId) => {
     setActiveJourneyId(journeyId);
@@ -721,7 +828,7 @@ export function AppProvider({ children }) {
           setJourneys((prev) => [cloudJ, ...prev]);
           setActiveJourneyId(cloudJ.id);
           setActivePage('trip-details');
-          addToast('Saved to MongoDB Atlas', `"${cloudJ.title}" synced to your cloud account.`, 'success');
+          addToast('Saved to Database', `"${cloudJ.title}" synced to your cloud account.`, 'success');
           try { confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } }); } catch {}
           return cloudJ;
         }
@@ -845,7 +952,7 @@ export function AppProvider({ children }) {
           setJourneys((prev) =>
             prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j))
           );
-          addToast('Saved to MongoDB Atlas', 'Your trip chain details were saved successfully.', 'success');
+          addToast('Saved to Database', 'Your trip chain details were saved successfully.', 'success');
           return cloudJ;
         }
       } catch (err) {
@@ -933,7 +1040,7 @@ export function AppProvider({ children }) {
         if (res.journey) {
           const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
           setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
-          addToast('Saved to MongoDB Atlas', `Added leg: ${payload.origin} ➔ ${payload.destination}.`, 'success');
+          addToast('Saved to Database', `Added leg: ${payload.origin} ➔ ${payload.destination}.`, 'success');
           return cloudJ;
         }
       } catch (err) {
@@ -1014,7 +1121,7 @@ export function AppProvider({ children }) {
         if (res.journey) {
           const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
           setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
-          addToast('Saved to MongoDB Atlas', 'Segment in trip chain successfully modified.', 'success');
+          addToast('Saved to Database', 'Segment in trip chain successfully modified.', 'success');
           return cloudJ;
         }
       } catch (err) {
@@ -1084,7 +1191,7 @@ export function AppProvider({ children }) {
         if (res.journey) {
           const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
           setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
-          addToast('Saved to MongoDB Atlas', 'Segment removed and trip chain re-ordered.', 'info');
+          addToast('Saved to Database', 'Segment removed and trip chain re-ordered.', 'info');
           return cloudJ;
         }
       } catch (err) {
@@ -1139,7 +1246,7 @@ export function AppProvider({ children }) {
         if (res.journey) {
           const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
           setJourneys((prev) => prev.map((j) => (j.id === journeyId || j._id === journeyId ? cloudJ : j)));
-          addToast('Saved to MongoDB Atlas', `Segment moved ${direction} and saved to cloud.`, 'info');
+          addToast('Saved to Database', `Segment moved ${direction} and saved to cloud.`, 'info');
           return cloudJ;
         }
       } catch (err) {
@@ -1227,7 +1334,7 @@ export function AppProvider({ children }) {
         if (res.place) {
           const cloudP = { ...res.place, id: res.place.id || res.place._id, coords: [res.place.lat, res.place.lng] };
           setSavedPlaces((prev) => [cloudP, ...prev]);
-          addToast('Saved to MongoDB Atlas', `Safe Zone "${cloudP.name}" added to cloud profile.`, 'success');
+          addToast('Saved to Database', `Safe Zone "${cloudP.name}" added to cloud profile.`, 'success');
           return cloudP;
         }
       } catch (err) {
@@ -1279,7 +1386,7 @@ export function AppProvider({ children }) {
           setSavedPlaces((prev) =>
             prev.map((p) => (p.id === placeId || p._id === placeId ? cloudP : p))
           );
-          addToast('Saved to MongoDB Atlas', 'Geofence parameters updated successfully on cloud.', 'success');
+          addToast('Saved to Database', 'Geofence parameters updated successfully on cloud.', 'success');
           return cloudP;
         }
       } catch (err) {
@@ -1326,7 +1433,7 @@ export function AppProvider({ children }) {
         if (res.contact) {
           const cloudC = { ...res.contact, id: res.contact.id || res.contact._id };
           setTrustedContacts((prev) => [...prev, cloudC]);
-          addToast('Saved to MongoDB Atlas', `${cloudC.name} added to cloud ICE contacts.`, 'success');
+          addToast('Saved to Database', `${cloudC.name} added to cloud ICE contacts.`, 'success');
           return cloudC;
         }
       } catch (err) {
@@ -1360,7 +1467,7 @@ export function AppProvider({ children }) {
           setTrustedContacts((prev) =>
             prev.map((c) => (c.id === id || c._id === id ? cloudC : c))
           );
-          addToast('Saved to MongoDB Atlas', 'Emergency contact details were saved on cloud.', 'success');
+          addToast('Saved to Database', 'Emergency contact details were saved on cloud.', 'success');
           return cloudC;
         }
       } catch (err) {
@@ -1618,61 +1725,191 @@ export function AppProvider({ children }) {
     setIsSosModalOpen(false);
   };
 
-  // Journey Controls (Start Journey / End Journey)
-  const startJourney = (targetJourneyId) => {
+  // Journey Controls (Start Journey / Advance / End Journey)
+  const startJourney = async (targetJourneyId) => {
     const targetId = targetJourneyId || activeJourneyId;
-    const targetJourney = journeys.find((j) => j.id === targetId) || journeys[0];
+    const targetJourney = journeys.find((j) => j.id === targetId || j._id === targetId) || journeys[0];
+    if (!targetJourney) return;
+
+    const realTargetId = targetJourney.id || targetJourney._id;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toISOString().split('T')[0];
 
+    const currentSegments = targetJourney.segments || targetJourney.travelSegments || [];
+    const updatedSegments = currentSegments.map((s, idx) => ({
+      ...s,
+      status: idx === 0 ? 'In Progress' : (s.status === 'Completed' ? 'Completed' : 'Scheduled'),
+    }));
+
+    // Update journeys state: target becomes 'In Progress', others revert if they were in progress
+    setJourneys((prev) =>
+      prev.map((j) => {
+        const jId = j.id || j._id;
+        if (jId === realTargetId) {
+          return {
+            ...j,
+            status: 'In Progress',
+            segments: updatedSegments,
+            travelSegments: updatedSegments,
+          };
+        }
+        if (j.status === 'In Progress' || j.status === 'Active') {
+          return { ...j, status: 'Upcoming' };
+        }
+        return j;
+      })
+    );
+
+    setActiveJourneyId(realTargetId);
     setJourneyLiveState({
       status: 'in_progress',
       startTime: timeStr,
-      startedDate: now.toISOString().split('T')[0],
+      startedDate: dateStr,
       activeSegmentIndex: 0,
       elapsedMinutes: 0,
-      journeyId: targetId,
+      journeyId: realTargetId,
     });
 
-    addToast('Journey Started', `Started "${targetJourney.title}". Segment 1 active.`, 'success');
+    addToast('Journey Started', `Started "${targetJourney.title}". Segment 1 live.`, 'success');
+
+    // Persist to MongoDB if authenticated
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(realTargetId, {
+          status: 'In Progress',
+          segments: updatedSegments,
+        });
+      } catch (e) {
+        console.warn('Backend journey start sync failed:', e.message);
+        addToast('Database Sync Warning', 'Could not sync journey status to database: ' + (e.message || 'Database unavailable'), 'warning');
+      }
+    }
   };
 
-  const endJourney = () => {
-    const currentJourney = journeys.find((j) => j.id === journeyLiveState.journeyId) || activeJourney;
+  const advanceSegment = async () => {
+    const currentJourney = journeys.find((j) => j.id === journeyLiveState.journeyId || j._id === journeyLiveState.journeyId) || activeJourney;
+    if (!currentJourney) return;
+
+    const currentSegments = currentJourney.segments || currentJourney.travelSegments || [];
+    const totalSegments = currentSegments.length;
+    const currentIdx = journeyLiveState.activeSegmentIndex;
+    const nextIdx = currentIdx + 1;
+
+    if (nextIdx < totalSegments) {
+      const updatedSegments = currentSegments.map((s, idx) => {
+        if (idx === currentIdx) return { ...s, status: 'Completed' };
+        if (idx === nextIdx) return { ...s, status: 'In Progress' };
+        return s;
+      });
+
+      const realJourneyId = currentJourney.id || currentJourney._id;
+
+      setJourneys((prev) =>
+        prev.map((j) => {
+          if ((j.id || j._id) === realJourneyId) {
+            return {
+              ...j,
+              segments: updatedSegments,
+              travelSegments: updatedSegments,
+            };
+          }
+          return j;
+        })
+      );
+
+      setJourneyLiveState((prev) => ({
+        ...prev,
+        activeSegmentIndex: nextIdx,
+      }));
+
+      const nextSeg = updatedSegments[nextIdx];
+      addToast(
+        'Segment Advanced',
+        `Waypoint reached. Next: ${nextSeg?.destination || nextSeg?.to || 'Next Waypoint'}.`,
+        'info'
+      );
+
+      if (isAuthenticated && isBackendConnected) {
+        try {
+          await api.journeys.update(realJourneyId, { segments: updatedSegments });
+        } catch (e) {
+          console.warn('Backend advance segment sync failed:', e.message);
+          addToast('Database Sync Warning', 'Could not sync segment to database: ' + (e.message || 'Database unavailable'), 'warning');
+        }
+      }
+    } else {
+      endJourney();
+    }
+  };
+
+  const endJourney = async () => {
+    const currentJourney = journeys.find((j) => j.id === journeyLiveState.journeyId || j._id === journeyLiveState.journeyId) || activeJourney;
+    if (!currentJourney) return;
+
+    const realJourneyId = currentJourney.id || currentJourney._id;
     const now = new Date();
     const dateStr = 'Today, ' + now.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
+    const currentSegments = currentJourney.segments || currentJourney.travelSegments || [];
+    const completedSegments = currentSegments.map((s) => ({
+      ...s,
+      status: 'Completed',
+    }));
+
+    const realDist = Number(currentJourney.totalDistanceKm != null ? currentJourney.totalDistanceKm : currentJourney.distanceKm) || 0;
+    const realDurMins = Number(currentJourney.totalDurationMinutes) || currentSegments.reduce((acc, s) => acc + (parseInt(s.durationMinutes, 10) || 0), 0) || 30;
+    const realCo2 = Number(currentJourney.estimatedCo2Kg != null ? currentJourney.estimatedCo2Kg : currentJourney.co2SavedKg) || parseFloat((realDist * 0.18).toFixed(1));
+
+    const hrs = Math.floor(realDurMins / 60);
+    const mins = realDurMins % 60;
+    const durStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+
     const newRecord = {
       id: 'rj-' + Date.now(),
-      title: currentJourney?.title || 'Kyoto Cultural Traverse',
-      destination: currentJourney?.destination || 'Kyoto, Japan',
+      title: currentJourney.title || 'Completed Journey',
+      destination: currentJourney.destination || 'Destination',
       date: dateStr,
-      distanceKm: 38.9,
-      distanceMi: 24.2,
-      duration: '3h 15m',
-      transportModes: currentJourney?.transitTypes || ['bullet_train', 'walking'],
-      co2SavedKg: 8.9,
+      distanceKm: realDist,
+      distanceMi: parseFloat((realDist * 0.621371).toFixed(1)),
+      duration: durStr,
+      transportModes: currentJourney.transitTypes || [currentJourney.primaryTransportMode?.toLowerCase() || 'walking'],
+      co2SavedKg: realCo2,
       status: 'Completed',
-      notes: `Finalized demo journey from ${currentJourney?.waypoints?.[0]?.title || 'Origin'} to ${currentJourney?.waypoints?.[currentJourney.waypoints.length - 1]?.title || 'Destination'}. All segments recorded.`,
+      notes: `Finalized journey from ${currentJourney.origin || currentJourney.waypoints?.[0]?.title || 'Origin'} to ${currentJourney.destination}. All segments recorded.`,
     };
 
     setRecentJourneys((prev) => [newRecord, ...prev]);
 
     setSummaryStats((prev) => ({
       ...prev,
-      journeysCompleted: prev.journeysCompleted + 1,
-      totalDistanceKm: prev.totalDistanceKm + 38.9,
-      totalTravelTimeHours: parseFloat((prev.totalTravelTimeHours + 3.25).toFixed(2)),
-      totalCo2SavedKg: prev.totalCo2SavedKg + 8.9,
+      journeysCompleted: (prev.journeysCompleted || 0) + 1,
+      totalDistanceKm: parseFloat(((prev.totalDistanceKm || 0) + realDist).toFixed(1)),
+      totalTravelTimeHours: parseFloat(((prev.totalTravelTimeHours || 0) + (realDurMins / 60)).toFixed(2)),
+      totalCo2SavedKg: parseFloat(((prev.totalCo2SavedKg || 0) + realCo2).toFixed(2)),
     }));
 
-    setJourneyLiveState((prev) => ({
-      ...prev,
+    setJourneys((prev) =>
+      prev.map((j) => {
+        if ((j.id || j._id) === realJourneyId) {
+          return {
+            ...j,
+            status: 'Completed',
+            segments: completedSegments,
+            travelSegments: completedSegments,
+          };
+        }
+        return j;
+      })
+    );
+
+    setJourneyLiveState({
       status: 'idle',
-      activeSegmentIndex: 3,
-    }));
+      activeSegmentIndex: 0,
+      journeyId: null,
+    });
 
-    addToast('Journey Completed!', `"${currentJourney?.title || 'Journey'}" finalized and added to Recent Journeys.`, 'success');
+    addToast('Journey Completed!', `"${currentJourney.title || 'Journey'}" finalized and marked Completed.`, 'success');
 
     try {
       confetti({
@@ -1681,22 +1918,17 @@ export function AppProvider({ children }) {
         origin: { y: 0.7 },
       });
     } catch {}
-  };
 
-  const advanceSegment = () => {
-    const currentJourney = journeys.find((j) => j.id === journeyLiveState.journeyId) || activeJourney;
-    const totalSegments = currentJourney?.travelSegments?.length || 4;
-    const nextIdx = journeyLiveState.activeSegmentIndex + 1;
-
-    if (nextIdx < totalSegments) {
-      setJourneyLiveState((prev) => ({
-        ...prev,
-        activeSegmentIndex: nextIdx,
-      }));
-      const nextSeg = currentJourney?.travelSegments?.[nextIdx];
-      addToast('Segment Advanced', `Arrived at waypoint. Next: ${nextSeg?.to || 'Next destination'}.`, 'info');
-    } else {
-      endJourney();
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(realJourneyId, {
+          status: 'Completed',
+          segments: completedSegments,
+        });
+      } catch (e) {
+        console.warn('Backend end journey sync failed:', e.message);
+        addToast('Database Sync Warning', 'Could not sync completed status to database: ' + (e.message || 'Database unavailable'), 'warning');
+      }
     }
   };
 
@@ -1815,6 +2047,7 @@ export function AppProvider({ children }) {
     isBackendConnected,
     isDemoMode,
     setIsDemoMode,
+    enterDemoMode,
     isAuthModalOpen,
     authModalMode,
     openAuthModal,
