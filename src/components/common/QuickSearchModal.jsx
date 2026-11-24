@@ -131,29 +131,29 @@ export default function QuickSearchModal() {
         aria-hidden="true"
       />
       <div
-        className="relative w-full max-w-2xl bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col"
+        className="relative w-full max-w-2xl bg-travel-card border border-travel rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3.5 border-b border-slate-800 bg-slate-900/80">
-          <Search className="w-5 h-5 text-teal-400 shrink-0 mr-3" />
+        <div className="flex items-center px-4 py-3.5 border-b border-travel bg-travel-subtle">
+          <Search className="w-5 h-5 text-travel-accent shrink-0 mr-3" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search journeys, places, embassy hotlines, or safety vault... (Ctrl+K)"
             autoFocus
-            className="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+            className="w-full bg-transparent text-sm text-travel-primary placeholder:text-travel-muted focus:outline-none"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 text-slate-400 hover:text-white mr-2"
+              className="p-1 text-travel-muted hover:text-travel-primary mr-2"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-          <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono border border-slate-700">
+          <span className="text-[10px] bg-travel-subtle text-travel-muted px-2 py-0.5 rounded font-mono border border-travel">
             ESC
           </span>
         </div>
@@ -161,7 +161,7 @@ export default function QuickSearchModal() {
         {/* Results List */}
         <div className="max-h-[60vh] overflow-y-auto p-2 space-y-1 custom-scrollbar">
           {searchResults.length === 0 ? (
-            <div className="py-12 text-center text-slate-500 text-xs">
+            <div className="py-12 text-center text-travel-muted text-xs">
               No matching journeys, places, or safety entries found for "{query}".
             </div>
           ) : (
@@ -171,22 +171,22 @@ export default function QuickSearchModal() {
                 <div
                   key={idx}
                   onClick={item.action}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/80 cursor-pointer transition group border border-transparent hover:border-slate-700/60"
+                  className="flex items-center justify-between p-3 rounded-xl hover:bg-travel-subtle cursor-pointer transition group border border-transparent hover:border-travel/60"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-teal-400 group-hover:bg-teal-500/20 group-hover:text-teal-300 transition shrink-0">
+                    <div className="w-9 h-9 rounded-lg bg-travel-subtle flex items-center justify-center text-travel-accent group-hover:bg-travel-accent-soft group-hover:text-travel-accent transition shrink-0">
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-200 group-hover:text-white truncate">
+                      <div className="text-sm font-semibold text-travel-secondary group-hover:text-travel-primary truncate">
                         {item.title}
                       </div>
-                      <div className="text-xs text-slate-400 truncate mt-0.5">
+                      <div className="text-xs text-travel-muted truncate mt-0.5">
                         {item.subtitle}
                       </div>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-teal-400 shrink-0 ml-3 transition transform group-hover:translate-x-1" />
+                  <ArrowRight className="w-4 h-4 text-travel-muted group-hover:text-travel-accent shrink-0 ml-3 transition transform group-hover:translate-x-1" />
                 </div>
               );
             })
@@ -194,9 +194,9 @@ export default function QuickSearchModal() {
         </div>
 
         {/* Search Footer */}
-        <div className="px-4 py-2 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+        <div className="px-4 py-2 bg-travel-subtle border-t border-travel flex items-center justify-between text-[11px] text-travel-muted font-mono">
           <span>Navigate with click • Press ESC to close</span>
-          <span className="text-teal-400">TripMate Search</span>
+          <span className="text-travel-accent">TripMate Search</span>
         </div>
       </div>
     </div>

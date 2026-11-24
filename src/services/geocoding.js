@@ -1,25 +1,209 @@
 /**
  * OpenStreetMap Nominatim Geocoding and Browser Geolocation Service
- * Provides forward geocoding, reverse geocoding, and explicit GPS location lookups
- * using real OpenStreetMap coordinates.
+ * Provides forward geocoding, reverse geocoding, and city/place search
+ * using real OpenStreetMap data.
  */
 
 const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
-// In-memory cache for recent searches to reduce network traffic
+// In-memory cache for recent searches to reduce network traffic & respect rate limits
 const geocodeCache = new Map();
 
 /**
- * Forward Geocoding: Search OpenStreetMap Nominatim for locations matching query.
- * @param {string} query - Free text search (e.g. "Tokyo Tower", "Zurich HB", "Central Park")
- * @returns {Promise<Array<{ name: string, displayName: string, lat: number, lng: number, city?: string, country?: string }>>}
+ * Clean and format address components from OpenStreetMap Nominatim item
  */
-export async function searchLocation(query) {
+function formatNominatimItem(item) {
+  const addr = item.address || {};
+
+  // Best primary name
+  const primaryName =
+    item.name ||
+    addr.city ||
+    addr.town ||
+    addr.municipality ||
+    addr.village ||
+    addr.amenity ||
+    addr.tourism ||
+    addr.historic ||
+    addr.station ||
+    item.display_name.split(',')[0].trim();
+
+  const city =
+    addr.city ||
+    addr.town ||
+    addr.municipality ||
+    addr.village ||
+    addr.suburb ||
+    addr.county ||
+    '';
+
+  const state = addr.state || addr.region || addr.province || '';
+  const country = addr.country || '';
+  const countryCode = (addr.country_code || '').toUpperCase();
+
+  // Build clean, human-readable hierarchy e.g. "Telangana, India" or "Île-de-France, France"
+  const detailParts = [];
+  if (city && city !== primaryName) detailParts.push(city);
+  if (state && state !== primaryName) detailParts.push(state);
+  if (country) detailParts.push(country);
+
+  const subtitle = detailParts.length > 0 ? detailParts.join(', ') : item.display_name;
+
+  return {
+    id: item.place_id ? String(item.place_id) : `${item.lat},${item.lon}`,
+    name: primaryName,
+    displayName: item.display_name,
+    subtitle: subtitle,
+    city: city || primaryName,
+    state: state,
+    country: country,
+    countryCode: countryCode,
+    lat: parseFloat(item.lat),
+    lng: parseFloat(item.lon),
+    coords: [parseFloat(item.lat), parseFloat(item.lon)],
+    type: item.type || item.class || 'location',
+    importance: item.importance || 0,
+  };
+}
+
+// Popular Indian Destinations for default suggestions
+export const POPULAR_INDIAN_DESTINATIONS = [
+  {
+    id: 'in-vidisha',
+    name: 'Vidisha',
+    displayName: 'Vidisha, Madhya Pradesh, India',
+    subtitle: 'Madhya Pradesh, India',
+    city: 'Vidisha',
+    state: 'Madhya Pradesh',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 23.5251,
+    lng: 77.8081,
+    coords: [23.5251, 77.8081],
+    type: 'city',
+  },
+  {
+    id: 'in-bhopal',
+    name: 'Bhopal',
+    displayName: 'Bhopal, Madhya Pradesh, India',
+    subtitle: 'Madhya Pradesh, India',
+    city: 'Bhopal',
+    state: 'Madhya Pradesh',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 23.2599,
+    lng: 77.4126,
+    coords: [23.2599, 77.4126],
+    type: 'city',
+  },
+  {
+    id: 'in-indore',
+    name: 'Indore',
+    displayName: 'Indore, Madhya Pradesh, India',
+    subtitle: 'Madhya Pradesh, India',
+    city: 'Indore',
+    state: 'Madhya Pradesh',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 22.7196,
+    lng: 75.8577,
+    coords: [22.7196, 75.8577],
+    type: 'city',
+  },
+  {
+    id: 'in-delhi',
+    name: 'New Delhi',
+    displayName: 'New Delhi, Delhi, India',
+    subtitle: 'National Capital Territory of Delhi, India',
+    city: 'New Delhi',
+    state: 'Delhi',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 28.6139,
+    lng: 77.2090,
+    coords: [28.6139, 77.2090],
+    type: 'city',
+  },
+  {
+    id: 'in-mumbai',
+    name: 'Mumbai',
+    displayName: 'Mumbai, Maharashtra, India',
+    subtitle: 'Maharashtra, India',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 19.0760,
+    lng: 72.8777,
+    coords: [19.0760, 72.8777],
+    type: 'city',
+  },
+  {
+    id: 'in-bengaluru',
+    name: 'Bengaluru',
+    displayName: 'Bengaluru, Karnataka, India',
+    subtitle: 'Karnataka, India',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 12.9716,
+    lng: 77.5946,
+    coords: [12.9716, 77.5946],
+    type: 'city',
+  },
+  {
+    id: 'in-jaipur',
+    name: 'Jaipur',
+    displayName: 'Jaipur, Rajasthan, India',
+    subtitle: 'Rajasthan, India',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 26.9124,
+    lng: 75.7873,
+    coords: [26.9124, 75.7873],
+    type: 'city',
+  },
+  {
+    id: 'in-varanasi',
+    name: 'Varanasi',
+    displayName: 'Varanasi, Uttar Pradesh, India',
+    subtitle: 'Uttar Pradesh, India',
+    city: 'Varanasi',
+    state: 'Uttar Pradesh',
+    country: 'India',
+    countryCode: 'IN',
+    lat: 25.3176,
+    lng: 82.9739,
+    coords: [25.3176, 82.9739],
+    type: 'city',
+  },
+];
+
+/**
+ * Forward Geocoding: Search OpenStreetMap Nominatim for cities, places, landmarks.
+ * Prioritizes Indian regional queries (Vidisha, Bhopal, Indore, Delhi, Mumbai, Bengaluru, Jaipur)
+ * while smoothly resolving global destinations.
+ * @param {string} query - Free text search query
+ * @param {number} [limit=6] - Max results
+ * @returns {Promise<Array>} Array of formatted suggestion objects
+ */
+export async function searchLocation(query, limit = 6) {
   if (!query || typeof query !== 'string' || !query.trim()) {
-    return [];
+    return POPULAR_INDIAN_DESTINATIONS.slice(0, limit);
   }
 
   const cleanQuery = query.trim().toLowerCase();
+
+  // Instant prefix match from popular Indian destinations
+  const localIndianMatches = POPULAR_INDIAN_DESTINATIONS.filter((d) =>
+    d.name.toLowerCase().includes(cleanQuery) ||
+    d.city.toLowerCase().includes(cleanQuery) ||
+    d.state.toLowerCase().includes(cleanQuery)
+  );
+
   if (geocodeCache.has(cleanQuery)) {
     return geocodeCache.get(cleanQuery);
   }
@@ -28,7 +212,7 @@ export async function searchLocation(query) {
   const timeoutId = setTimeout(() => controller.abort(), 7000);
 
   try {
-    const url = `${NOMINATIM_BASE_URL}/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(
+    const url = `${NOMINATIM_BASE_URL}/search?format=json&limit=${limit * 2}&addressdetails=1&q=${encodeURIComponent(
       query.trim()
     )}`;
 
@@ -37,58 +221,58 @@ export async function searchLocation(query) {
       headers: {
         'Accept': 'application/json',
         'Accept-Language': 'en',
+        'User-Agent': 'TripMate-Student-App/1.0 (achintya@tripmate.local)',
       },
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      if (localIndianMatches.length > 0) return localIndianMatches.slice(0, limit);
       throw new Error(`Nominatim query returned HTTP ${response.status}`);
     }
 
     const data = await response.json();
+    if (!Array.isArray(data)) {
+      return localIndianMatches.slice(0, limit);
+    }
 
-    const formatted = data.map((item) => {
-      const addr = item.address || {};
-      const primaryName =
-        item.name ||
-        addr.amenity ||
-        addr.tourism ||
-        addr.historic ||
-        addr.station ||
-        item.display_name.split(',')[0].trim();
+    const formatted = data.map(formatNominatimItem);
 
-      const city =
-        addr.city || addr.town || addr.municipality || addr.village || addr.county || '';
-      const country = addr.country || '';
-
-      return {
-        id: item.place_id ? String(item.place_id) : `${item.lat},${item.lon}`,
-        name: primaryName,
-        displayName: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-        coords: [parseFloat(item.lat), parseFloat(item.lon)],
-        city,
-        country,
-        type: item.type,
-      };
+    // Prioritize Indian results unless user specifically queried an international destination
+    const sorted = [...formatted].sort((a, b) => {
+      const aIsIndia = a.countryCode === 'IN' || a.country?.toLowerCase() === 'india';
+      const bIsIndia = b.countryCode === 'IN' || b.country?.toLowerCase() === 'india';
+      if (aIsIndia && !bIsIndia) return -1;
+      if (!aIsIndia && bIsIndia) return 1;
+      return (b.importance || 0) - (a.importance || 0);
     });
 
-    // Cache up to 40 items
-    if (geocodeCache.size >= 40) {
+    // Merge any instant local matches at the top if relevant
+    const combined = [...localIndianMatches];
+    sorted.forEach((item) => {
+      if (!combined.some((c) => c.displayName === item.displayName || c.id === item.id)) {
+        combined.push(item);
+      }
+    });
+
+    const finalResults = combined.slice(0, limit);
+
+    // Cache up to 50 queries
+    if (geocodeCache.size >= 50) {
       const firstKey = geocodeCache.keys().next().value;
       geocodeCache.delete(firstKey);
     }
-    geocodeCache.set(cleanQuery, formatted);
+    geocodeCache.set(cleanQuery, finalResults);
 
-    return formatted;
+    return finalResults;
   } catch (err) {
     clearTimeout(timeoutId);
+    if (localIndianMatches.length > 0) return localIndianMatches.slice(0, limit);
     if (err.name === 'AbortError') {
       console.warn('Geocoding request timed out for:', query);
     } else {
-      console.warn('Geocoding search failed:', err.message);
+      console.warn('Geocoding search error:', err.message);
     }
     return [];
   }
@@ -98,7 +282,7 @@ export async function searchLocation(query) {
  * Reverse Geocoding: Look up address information for a coordinate pair.
  * @param {number} lat
  * @param {number} lng
- * @returns {Promise<{ name: string, displayName: string, city: string, country: string } | null>}
+ * @returns {Promise<{ name: string, displayName: string, city: string, state: string, country: string } | null>}
  */
 export async function reverseGeocode(lat, lng) {
   if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return null;
@@ -114,6 +298,7 @@ export async function reverseGeocode(lat, lng) {
       headers: {
         'Accept': 'application/json',
         'Accept-Language': 'en',
+        'User-Agent': 'TripMate-Student-App/1.0 (achintya@tripmate.local)',
       },
     });
 
@@ -122,26 +307,8 @@ export async function reverseGeocode(lat, lng) {
     if (!response.ok) return null;
 
     const item = await response.json();
-    const addr = item.address || {};
-    const primaryName =
-      item.name ||
-      addr.amenity ||
-      addr.tourism ||
-      addr.building ||
-      addr.road ||
-      item.display_name?.split(',')?.[0]?.trim() ||
-      'Current Position';
-
-    const city =
-      addr.city || addr.town || addr.municipality || addr.village || addr.county || '';
-    const country = addr.country || '';
-
-    return {
-      name: primaryName,
-      displayName: item.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      city,
-      country,
-    };
+    const formatted = formatNominatimItem(item);
+    return formatted;
   } catch (err) {
     clearTimeout(timeoutId);
     console.warn('Reverse geocode failed:', err.message);

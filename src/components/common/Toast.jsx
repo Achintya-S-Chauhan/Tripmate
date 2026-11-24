@@ -19,19 +19,19 @@ export default function ToastContainer() {
             key={toast.id}
             className={`pointer-events-auto rounded-xl p-3.5 border shadow-2xl backdrop-blur-md flex items-start gap-3 transition-all duration-300 animate-slide-up ${
               isSuccess
-                ? 'bg-[#0f2420]/95 border-emerald-500/40 text-emerald-100'
+                ? 'bg-emerald-900/90 dark:bg-emerald-950/95 border-emerald-600/40 text-emerald-100'
                 : isWarning
-                ? 'bg-[#2a1715]/95 border-rose-500/50 text-rose-100'
+                ? 'bg-amber-900/90 dark:bg-amber-950/95 border-amber-500/40 text-amber-100'
                 : isError
-                ? 'bg-rose-950/95 border-rose-600/60 text-white'
-                : 'bg-slate-900/95 border-slate-700/80 text-slate-100'
+                ? 'bg-rose-900/90 dark:bg-rose-950/95 border-rose-600/50 text-white'
+                : 'bg-travel-card/95 border-travel text-travel-primary shadow-elevated'
             }`}
           >
             <div className="shrink-0 mt-0.5">
               {isSuccess && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
               {isWarning && <AlertTriangle className="w-5 h-5 text-rose-400" />}
               {isError && <XCircle className="w-5 h-5 text-rose-500" />}
-              {!isSuccess && !isWarning && !isError && <Info className="w-5 h-5 text-teal-400" />}
+              {!isSuccess && !isWarning && !isError && <Info className="w-5 h-5 text-travel-accent" />}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -41,7 +41,7 @@ export default function ToastContainer() {
 
             <button
               onClick={() => removeToast(toast.id)}
-              className="shrink-0 text-slate-400 hover:text-white p-1 rounded-md transition"
+              className="shrink-0 text-travel-muted hover:text-travel-primary p-1 rounded-md transition"
             >
               <X className="w-3.5 h-3.5" />
             </button>

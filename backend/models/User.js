@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide a name'],
       trim: true,
+      minlength: [2, 'Name must be at least 2 characters long'],
       maxlength: [50, 'Name cannot exceed 50 characters'],
     },
     email: {
@@ -32,7 +33,11 @@ const UserSchema = new mongoose.Schema(
     },
     homeCity: {
       type: String,
-      default: 'San Francisco, CA',
+      default: 'Vidisha, Madhya Pradesh',
+    },
+    homeCountry: {
+      type: String,
+      default: 'India',
     },
     membership: {
       type: String,
@@ -47,7 +52,20 @@ const UserSchema = new mongoose.Schema(
     settings: {
       distanceUnit: { type: String, enum: ['km', 'mi'], default: 'km' },
       tempUnit: { type: String, enum: ['C', 'F'], default: 'C' },
-      currency: { type: String, default: 'USD' },
+      currency: { type: String, default: 'INR' },
+      homeCountry: { type: String, default: 'India' },
+      dateFormat: { type: String, default: 'DD/MM/YYYY' },
+      timeFormat: { type: String, enum: ['12h', '24h'], default: '24h' },
+      locale: { type: String, default: 'en-IN' },
+      theme: { type: String, enum: ['forest', 'ocean', 'sand', 'slate', 'dark', 'light'], default: 'forest' },
+      themeFamily: { type: String, default: 'forest' },
+      appearance: { type: String, enum: ['light', 'dark', 'system'], default: 'dark' },
+      reducedMotion: { type: Boolean, default: false },
+      travelPreferences: {
+        preferFewerTransfers: { type: Boolean, default: false },
+        preferDirect: { type: Boolean, default: false },
+        maxWalkingMinutes: { type: Number, default: 20 },
+      },
       safetySensitivity: { type: String, default: 'Standard' },
       autoCheckinInterval: { type: String, default: '8h' },
     },
@@ -80,4 +98,3 @@ UserSchema.methods.toJSON = function () {
 
 const User = mongoose.model('User', UserSchema);
 export default User;
-

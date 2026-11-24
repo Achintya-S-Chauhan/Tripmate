@@ -297,15 +297,28 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Create user record
+    // Create user record with India defaults
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      homeCity: homeCity?.trim() || 'San Francisco, CA',
+      homeCity: homeCity?.trim() || 'Vidisha, Madhya Pradesh',
+      homeCountry: 'India',
       avatarUrl:
         avatarUrl ||
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+      settings: {
+        distanceUnit: 'km',
+        tempUnit: 'C',
+        currency: 'INR',
+        homeCountry: 'India',
+        dateFormat: 'DD/MM/YYYY',
+        timeFormat: '24h',
+        locale: 'en-IN',
+        theme: 'forest',
+        themeFamily: 'forest',
+        appearance: 'dark',
+      },
     });
 
     // User created with clean initial state - no mock records seeded
@@ -379,12 +392,33 @@ export const login = async (req, res, next) => {
 // @access  Private
 export const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    let user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User profile not found.',
       });
+    }
+
+    // Safe migration: upgrade legacy US defaults to India defaults without touching custom settings
+    if (user.homeCity === 'San Francisco, CA' && (user.homeCountry === 'United States' || !user.homeCountry)) {
+      user.homeCity = 'Vidisha, Madhya Pradesh';
+      user.homeCountry = 'India';
+      if (!user.settings) user.settings = {};
+      if (user.settings.currency === 'USD' || !user.settings.currency) {
+        user.settings.currency = 'INR';
+      }
+      if (user.settings.homeCountry === 'United States' || !user.settings.homeCountry) {
+        user.settings.homeCountry = 'India';
+      }
+      if (user.settings.dateFormat === 'YYYY-MM-DD' || !user.settings.dateFormat) {
+        user.settings.dateFormat = 'DD/MM/YYYY';
+      }
+      if (user.settings.timeFormat === '12h' || !user.settings.timeFormat) {
+        user.settings.timeFormat = '24h';
+      }
+      user.settings.locale = 'en-IN';
+      await user.save();
     }
 
     res.status(200).json({
@@ -401,13 +435,37 @@ export const getMe = async (req, res, next) => {
 // @access  Private
 export const updateProfile = async (req, res, next) => {
   try {
-    const { name, homeCity, avatarUrl, settings } = req.body;
+    const { name, homeCity, homeCountry, avatarUrl, settings } = req.body;
 
     const fieldsToUpdate = {};
-    if (name) fieldsToUpdate.name = name.trim();
-    if (homeCity) fieldsToUpdate.homeCity = homeCity.trim();
-    if (avatarUrl) fieldsToUpdate.avatarUrl = avatarUrl;
-    if (settings) fieldsToUpdate.settings = settings;
+    if (name !== undefined) {
+      const trimmedName = String(name).trim();
+      if (trimmedName.length < 2 || trimmedName.length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Full name must be between 2 and 50 characters long.',
+        });
+      }
+      fieldsToUpdate.name = trimmedName;
+    }
+
+    if (homeCity !== undefined) fieldsToUpdate.homeCity = String(homeCity).trim();
+    if (homeCountry !== undefined) fieldsToUpdate.homeCountry = String(homeCountry).trim();
+
+    if (avatarUrl !== undefined) {
+      // Validate image data URL or URL size to avoid giant mongo documents (> 500KB)
+      if (typeof avatarUrl === 'string' && avatarUrl.length > 700000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Avatar image is too large. Please select an image under 500KB.',
+        });
+      }
+      fieldsToUpdate.avatarUrl = avatarUrl;
+    }
+
+    if (settings !== undefined) {
+      fieldsToUpdate.settings = settings;
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,

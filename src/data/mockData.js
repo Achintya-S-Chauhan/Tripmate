@@ -5,7 +5,8 @@ export const INITIAL_USER = {
   name: "Alex Sterling",
   handle: "@alex_travels",
   email: "alex.sterling@example.com",
-  homeCity: "San Francisco, CA",
+  homeCity: "Vidisha, Madhya Pradesh",
+  homeCountry: "India",
   membership: "TripMate Explorer Pro",
   avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80",
   safeTravelScore: 98,
@@ -15,16 +16,31 @@ export const INITIAL_USER = {
 };
 
 export const INITIAL_SETTINGS = {
+  themeFamily: "forest", // 'forest', 'ocean', 'sand', 'slate'
+  appearance: "dark", // 'light', 'dark', 'system'
+  theme: "dark", // backward compatibility
   distanceUnit: "km", // 'km' or 'mi'
   tempUnit: "C", // 'C' or 'F'
-  currency: "USD", // 'USD', 'EUR', 'JPY', 'GBP'
-  currencySymbol: "$",
+  currency: "INR", // 'INR', 'USD', 'EUR', 'JPY', 'GBP'
+  currencySymbol: "₹",
+  country: "India",
+  countryCode: "IN",
+  homeCity: "Vidisha, Madhya Pradesh",
+  homeCountry: "India",
+  dateFormat: "DD/MM/YYYY",
+  timeFormat: "24h",
+  locale: "en-IN",
   safetySensitivity: "Standard", // 'Discreet', 'Standard', 'High Alert'
   autoCheckinInterval: "8h", // 'Off', '4h', '8h', '24h'
   mapStyle: "dark", // 'dark', 'street', 'satellite'
   offlineMode: false,
   soundAlerts: true,
   simulatedGpsJitter: false,
+  travelPreferences: {
+    preferFewerTransfers: false,
+    preferDirect: false,
+    maxWalkingMinutes: 20,
+  },
 };
 
 export const INITIAL_JOURNEYS = [
@@ -1304,42 +1320,28 @@ export const INITIAL_TRUSTED_CONTACTS = [
   },
 ];
 
-export const INITIAL_GEOFENCE_LOGS = [
+// Geofence event logs start empty for user accounts
+export const INITIAL_GEOFENCE_LOGS = [];
+
+// Realistic Danger Zones for proactive hazard perimeter monitoring
+export const INITIAL_DANGER_ZONES = [
   {
-    id: "geo-log-1",
-    placeId: "sp-103",
-    placeName: "The Celestine Hotel Gion",
-    category: "Hotel",
-    eventType: "ENTRY",
-    timestamp: "Today, 08:30 PM",
-    radiusMeters: 250,
-    coords: [34.9989, 135.7731],
-    note: "Simulated Geofence Trigger: Entered safe hotel perimeter (250m). Automated reassurance ping simulated.",
-    isSimulated: true,
+    id: 'dz-1',
+    name: 'Betwa River Lowland Flood Risk Zone',
+    hazardType: 'Flood Risk',
+    coords: [23.5350, 77.8150], // Vidisha
+    radiusMeters: 450,
+    isActive: true,
+    notes: 'Low-lying riverbank terrain susceptible to sudden flash flooding during monsoons.',
   },
   {
-    id: "geo-log-2",
-    placeId: "sp-104",
-    placeName: "Kyoto Prefectural Police Foreign Desk",
-    category: "Checkpoint",
-    eventType: "EXIT",
-    timestamp: "Today, 04:15 PM",
-    radiusMeters: 300,
-    coords: [35.0210, 135.7540],
-    note: "Simulated Geofence Trigger: Departed foreign safety desk boundary (300m).",
-    isSimulated: true,
-  },
-  {
-    id: "geo-log-3",
-    placeId: "sp-101",
-    placeName: "Honke Owariya (Kyoto Oldest Soba)",
-    category: "Dining",
-    eventType: "ENTRY",
-    timestamp: "Today, 01:10 PM",
-    radiusMeters: 150,
-    coords: [35.0135, 135.7592],
-    note: "Simulated Geofence Trigger: Entered designated dining zone (150m).",
-    isSimulated: true,
+    id: 'dz-2',
+    name: 'Old Bypass NH-146 Earthwork Zone',
+    hazardType: 'Construction',
+    coords: [23.5180, 77.8020], // Vidisha
+    radiusMeters: 350,
+    isActive: true,
+    notes: 'Heavy machinery, deep unpaved gravel, unlit construction zone.',
   },
 ];
 

@@ -139,31 +139,86 @@ async function runVerification() {
   console.log(`   - Real Coordinates: [${newPlace.lat}, ${newPlace.lng}]`);
   console.log(`   - Geofence Perimeter: ${newPlace.radiusMeters}m`);
 
-  // Step 6: Test Real OpenStreetMap Nominatim Geocoding API
-  console.log('\n5️⃣ Testing Real OpenStreetMap Nominatim Geocoding API...');
-  try {
-    const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
-      'Kyoto Tower'
-    )}`;
-    const geoRes = await fetch(geoUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'TripMate-Verification-Suite/1.0',
-      },
-    });
+  // Step 5B: Test Trip Planning Workspace Schema (Stays, Places, Multi-Legs, Expenses)
+  console.log('\n5️⃣ Testing Dedicated Trip Planning Workspace Data Persistence...');
+  newJourney.stays.push({
+    name: 'The Thousand Kyoto Hotel',
+    propertyType: 'hotel',
+    address: '570 Higashishiokojicho, Shimogyo Ward, Kyoto',
+    checkInDate: '2026-10-28',
+    checkOutDate: '2026-10-31',
+    confirmationNumber: 'TH-99281',
+    totalPrice: 450,
+    currency: 'USD',
+    coords: [34.9868, 135.7601],
+  });
 
-    if (geoRes.ok) {
-      const geoData = await geoRes.json();
-      if (geoData.length > 0) {
-        console.log(`✅ OpenStreetMap Resolved: "${geoData[0].display_name}"`);
-        console.log(`   - Latitude: ${geoData[0].lat}, Longitude: ${geoData[0].lon}`);
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️ Nominatim query notice:', err.message);
+  newJourney.places.push({
+    title: 'Fushimi Inari Taisha',
+    category: 'attraction',
+    address: '68 Fukakusa Yabunouchicho, Fushimi Ward, Kyoto',
+    visited: true,
+    day: 1,
+    coords: [34.9671, 135.7727],
+  });
+
+  newJourney.expenses.push({
+    title: 'Shinkansen Bullet Train Ticket',
+    amount: 3200,
+    currency: 'JPY',
+    category: 'Transport',
+    date: '2026-10-28',
+    linkedType: 'transport_leg',
+  });
+
+  await newJourney.save();
+
+  const reloaded = await Journey.findById(newJourney._id);
+  if (
+    reloaded.stays.length !== 1 ||
+    reloaded.places.length !== 1 ||
+    reloaded.expenses.length !== 1 ||
+    !reloaded.places[0].visited
+  ) {
+    console.error('❌ Failed to persist stays/places/expenses!');
+    process.exit(1);
+  }
+  console.log('✅ Stays, Places, and Multi-Currency Expenses persisted in MongoDB:');
+  console.log(`   - Stay: "${reloaded.stays[0].name}" ($${reloaded.stays[0].totalPrice} ${reloaded.stays[0].currency})`);
+  console.log(`   - Place: "${reloaded.places[0].title}" (Visited: ${reloaded.places[0].visited})`);
+  console.log(`   - Expense: "${reloaded.expenses[0].title}" (¥${reloaded.expenses[0].amount} ${reloaded.expenses[0].currency})`);
+
+  // Step 6: Test Real Transport Discovery Service
+  console.log('\n6️⃣ Testing Transport Discovery Providers (OSRM + Public Transit Status)...');
+  const { discoverTransportOptions } = await import('../services/transportProvider.js');
+  const transportResult = await discoverTransportOptions({
+    origin: 'Kyoto Station',
+    destination: 'Osaka Station',
+    originCoords: [34.9858, 135.7588],
+    destCoords: [34.7024, 135.4959],
+  });
+
+  console.log(`✅ Transport discovery results:`);
+  if (transportResult.driving) {
+    console.log(`   - [DRIVING] ${transportResult.driving.title} | ${transportResult.driving.distanceKm} km | ${transportResult.driving.durationFormatted} (${transportResult.driving.source})`);
+  }
+  if (transportResult.walking) {
+    console.log(`   - [WALKING] ${transportResult.walking.title} | ${transportResult.walking.distanceKm} km | ${transportResult.walking.durationFormatted} (${transportResult.walking.source})`);
+  }
+  console.log(`   - [TRAIN] Status: ${transportResult.train.message}`);
+  console.log(`   - [BUS] Status: ${transportResult.bus.message}`);
+  console.log(`   - [FLIGHT] Status: ${transportResult.flight.message}`);
+
+  // Step 7: Test Real OpenStreetMap Nominatim Geocoding & Accommodations
+  console.log('\n7️⃣ Testing Real OpenStreetMap Nominatim Accommodation Search...');
+  const { searchRealAccommodations } = await import('../services/transportProvider.js');
+  const staysResult = await searchRealAccommodations({ destination: 'Kyoto', coords: [34.9858, 135.7588], limit: 4 });
+  console.log(`✅ Nominatim returned ${staysResult.length} verified accommodations in Kyoto`);
+  if (staysResult.length > 0) {
+    console.log(`   - First stay: "${staysResult[0].name}" at [${staysResult[0].coords.join(', ')}]`);
   }
 
-  // Step 7: Clean up test documents
+  // Step 8: Clean up test documents
   console.log('\n🧹 Cleaning up test artifacts from database...');
   await Promise.all([
     User.deleteOne({ _id: userId }),

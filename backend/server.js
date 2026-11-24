@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import journeyRoutes from './routes/journeyRoutes.js';
 import savedPlaceRoutes from './routes/savedPlaceRoutes.js';
 import trustedContactRoutes from './routes/trustedContactRoutes.js';
+import transportRoutes from './routes/transportRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Load environment variables (relative to server file or current working directory)
@@ -71,6 +72,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/journeys', journeyRoutes);
 app.use('/api/saved-places', savedPlaceRoutes);
 app.use('/api/trusted-contacts', trustedContactRoutes);
+app.use('/api/transport', transportRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api', (req, res) => {

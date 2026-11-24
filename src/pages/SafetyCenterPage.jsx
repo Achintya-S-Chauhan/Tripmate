@@ -145,11 +145,11 @@ export default function SafetyCenterPage() {
       {/* Top Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+          <h2 className="text-2xl font-black text-travel-primary tracking-tight flex items-center gap-2.5">
             <ShieldCheck className="w-6 h-6 text-emerald-400" />
             Safety & Emergency Center
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-travel-muted mt-1">
             Simulated emergency distress beacon, verified trusted contacts, and ICE medical vault disclosures.
           </p>
         </div>
@@ -169,169 +169,282 @@ export default function SafetyCenterPage() {
         </div>
       </div>
 
-      {/* 1. SIMULATED EMERGENCY SESSION ACTIVE CONSOLE (Shown when SOS is active) */}
+      {/* 1. SIMULATED EMERGENCY SESSION ACTIVE CONSOLE */}
       {isEmergency && (
-        <div className="rounded-3xl bg-gradient-to-r from-[#20080f] via-[#2f0c16] to-[#1a070c] border-2 border-rose-500 p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-fade-in">
-          <div className="absolute right-0 top-0 bottom-0 w-80 bg-gradient-to-l from-rose-600/15 to-transparent pointer-events-none" />
-
-          <div className="relative z-10 space-y-6">
-            {/* Top Bar: Beacon Status + End Session Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-900/70 pb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-rose-600/20 border-2 border-rose-500 flex items-center justify-center text-rose-400 shrink-0 shadow-lg shadow-rose-900/50">
-                  <AlertOctagon className="w-6 h-6 animate-pulse" />
-                </div>
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-black uppercase tracking-wider">
-                    <Radio className="w-3 h-3 text-rose-400 animate-spin" />
-                    SIMULATED EMERGENCY SESSION ACTIVE
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-black text-white mt-0.5">
-                    Distress Telemetry & Mock Alert Broadcast
-                  </h3>
-                </div>
+        <div className="bg-travel-card rounded-2xl border-2 border-red-500/50 p-6 shadow-md space-y-5 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-travel pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                <AlertOctagon className="w-5 h-5 animate-pulse" />
               </div>
-
-              {/* End Emergency Session Button */}
-              <button
-                type="button"
-                onClick={endEmergencySession}
-                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-sm tracking-wide shadow-xl shadow-rose-600/40 transition transform active:scale-95 flex items-center justify-center gap-2 shrink-0"
-              >
-                <StopCircle className="w-5 h-5" />
-                <span>END EMERGENCY SESSION</span>
-              </button>
-            </div>
-
-            {/* Session Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              {/* Elapsed Time Card */}
-              <div className="bg-[#12080d] p-4 rounded-2xl border border-rose-900/60 space-y-1">
-                <span className="text-[10px] text-rose-400 uppercase font-black tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Session Elapsed Time
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tight">
-                  {formatElapsed(emergencySession.elapsedSeconds)}
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-[10px] font-bold uppercase tracking-wider">
+                  <Radio className="w-3 h-3 animate-spin" />
+                  Simulated Session Active
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Started at {emergencySession.startedAt} JST
-                </div>
-              </div>
-
-              {/* Sample Location Card */}
-              <div className="bg-[#12080d] p-4 rounded-2xl border border-rose-900/60 space-y-1 sm:col-span-2">
-                <span className="text-[10px] text-rose-400 uppercase font-black tracking-wider flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Sample Location (Simulated GPS)
-                  </span>
-                  <span className="font-mono text-emerald-400 font-semibold text-[10px]">
-                    {emergencySession.sampleLocation?.accuracy}
-                  </span>
-                </span>
-                <div className="text-white font-bold text-sm truncate">
-                  {emergencySession.sampleLocation?.name}
-                </div>
-                <div className="text-slate-300 text-[11px] truncate">
-                  {emergencySession.sampleLocation?.address}
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Simulated Coords: {emergencySession.sampleLocation?.coords ? emergencySession.sampleLocation.coords.join(', ') : '35.0037, 135.7770'}
-                </div>
+                <h3 className="text-lg font-bold text-travel-primary mt-0.5">
+                  Distress Telemetry & Mock Alert Broadcast
+                </h3>
               </div>
             </div>
 
-            {/* Mock Alert Delivery Status Breakdown */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                  <Share2 className="w-3.5 h-3.5 text-rose-400" />
-                  Mock Alert Delivery Status ({emergencySession.mockAlertDeliveries?.length || 0} Contacts)
-                </h4>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  * All transmissions are client-side simulations.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {emergencySession.mockAlertDeliveries?.map((delivery, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-[#12080d]/90 rounded-2xl p-4 border border-rose-900/50 space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-white text-xs">{delivery.name}</span>
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono font-bold border border-emerald-500/30">
-                        {delivery.status}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] text-slate-400 font-mono">
-                      {delivery.channel} • {delivery.phone}
-                    </div>
-
-                    <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 font-mono line-clamp-2 leading-relaxed">
-                      "{delivery.payloadPreview}"
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
-                      <span>Recipient Type: {delivery.relation || 'Emergency Contact'}</span>
-                      <span className="text-emerald-400 font-mono">Simulated</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. EMERGENCY SOS CONTROL HERO (Idle State - Calm Slate/Navy Aesthetic) */}
-      {!isEmergency && (
-        <div className="rounded-3xl bg-gradient-to-r from-[#0d1726] via-[#0f213d] to-[#0b1628] border border-slate-700/80 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-72 bg-gradient-to-l from-teal-500/5 to-transparent pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-teal-500/30 text-[11px] font-bold uppercase tracking-wider">
-                <Radio className="w-3.5 h-3.5 text-teal-400" />
-                Standby Emergency Protocol
-              </div>
-
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                Emergency SOS Simulator
-              </h3>
-
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Test TripMate's emergency broadcast routine. Protected by an accidental activation confirmation step before generating high-priority telemetry, medical ICE vault disclosures, and simulated contact alerts.
-              </p>
-
-              <div className="text-[11px] text-slate-400 font-mono pt-1">
-                * Demonstration Sandbox: Real 112 (India ERSS) / 911 / 110 emergency dispatch lines are NOT triggered.
-              </div>
-            </div>
-
-            {/* Prominent SOS Trigger Control */}
             <button
               type="button"
-              onClick={openSosConfirmation}
-              className="px-6 py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black text-sm tracking-wide shadow-xl shadow-rose-600/30 transition transform active:scale-95 flex items-center justify-center gap-2.5 shrink-0"
+              onClick={endEmergencySession}
+              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
             >
-              <ShieldAlert className="w-5 h-5 animate-pulse" />
-              <span>TRIGGER SOS SIMULATOR</span>
+              <StopCircle className="w-4 h-4" />
+              <span>End Emergency Session</span>
             </button>
+          </div>
+
+          {/* Session Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="bg-travel-subtle p-4 rounded-xl border border-travel space-y-1">
+              <span className="text-[10px] text-travel-muted uppercase font-bold tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-travel-accent" /> Elapsed Time
+              </span>
+              <div className="text-2xl font-mono font-bold text-travel-primary tracking-tight">
+                {formatElapsed(emergencySession.elapsedSeconds)}
+              </div>
+              <div className="text-[10px] text-travel-muted font-mono">
+                Started at {emergencySession.startedAt}
+              </div>
+            </div>
+
+            <div className="bg-travel-subtle p-4 rounded-xl border border-travel space-y-1 sm:col-span-2">
+              <span className="text-[10px] text-travel-muted uppercase font-bold tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-travel-accent" /> Sample Telemetry Location
+                </span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">
+                  {emergencySession.sampleLocation?.accuracy}
+                </span>
+              </span>
+              <div className="text-travel-primary font-bold text-sm truncate">
+                {emergencySession.sampleLocation?.name}
+              </div>
+              <div className="text-travel-secondary text-[11px] truncate">
+                {emergencySession.sampleLocation?.address}
+              </div>
+              <div className="text-[10px] text-travel-muted font-mono">
+                Simulated Coords: {emergencySession.sampleLocation?.coords ? emergencySession.sampleLocation.coords.join(', ') : '35.0037, 135.7770'}
+              </div>
+            </div>
+          </div>
+
+          {/* Mock Alert Delivery Status Breakdown */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-travel-primary uppercase tracking-wider flex items-center gap-2">
+                <Share2 className="w-3.5 h-3.5 text-travel-accent" />
+                Mock Alert Delivery Status ({emergencySession.mockAlertDeliveries?.length || 0} Contacts)
+              </h4>
+              <span className="text-[10px] text-travel-muted font-mono">
+                Client-side simulated dispatches
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {emergencySession.mockAlertDeliveries?.map((delivery, idx) => (
+                <div
+                  key={idx}
+                  className="bg-travel-subtle rounded-xl p-3.5 border border-travel space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-travel-primary text-xs">{delivery.name}</span>
+                    <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-mono font-bold border border-emerald-500/20">
+                      {delivery.status}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-travel-secondary font-mono">
+                    {delivery.channel} • {delivery.phone}
+                  </div>
+
+                  <div className="bg-travel-card p-2.5 rounded-lg border border-travel text-[11px] text-travel-secondary font-mono line-clamp-2 leading-relaxed">
+                    "{delivery.payloadPreview}"
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-travel-muted pt-1">
+                    <span>{delivery.relation || 'Emergency Contact'}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-mono">Simulated</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* 3. TRUSTED CONTACTS MANAGEMENT (Full CRUD: Add, Edit, Remove) */}
-      <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      {/* 2. EMERGENCY SOS CONTROL PANEL (Idle State) */}
+      {!isEmergency && (
+        <div className="bg-travel-card rounded-2xl border border-travel p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2 max-w-xl">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[10px] font-bold uppercase tracking-wider">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  Emergency Safety Console
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-travel-subtle text-travel-muted border border-travel text-[10px] font-mono">
+                  Sandbox Simulator
+                </span>
+              </div>
+
+              <h3 className="text-lg font-bold text-travel-primary tracking-tight">
+                Simulated Emergency SOS Routine
+              </h3>
+
+              <p className="text-xs text-travel-secondary leading-relaxed">
+                Test and verify emergency broadcast workflows, distress telemetry dispatches, and medical ICE disclosure logs. Accidental triggers are protected by a confirmation step.
+              </p>
+
+              <p className="text-[11px] text-travel-muted">
+                <strong>Demonstration Sandbox Notice:</strong> Real emergency services (112 / 911 / 110) and live telecom SMS dispatches are not contacted.
+              </p>
+            </div>
+
+            {/* Appropriately Sized, Restrained Emergency Button */}
+            <div className="flex flex-col items-start md:items-end gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={openSosConfirmation}
+                className="btn-travel-emergency px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm"
+              >
+                <Radio className="w-4 h-4" />
+                <span>Test Emergency SOS</span>
+              </button>
+              <span className="text-[10px] text-travel-muted font-mono">
+                Requires confirmation
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2B. INDIA EMERGENCY HELPLINES & CRISIS RESPONSE SERVICES */}
+      <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-travel pb-3">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-teal-400" />
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
+                <PhoneCall className="w-5 h-5 text-rose-500" />
+                India Emergency Helplines & First Response Services
+              </h3>
+              <span className="text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                Nationwide 24/7
+              </span>
+            </div>
+            <p className="text-xs text-travel-secondary mt-0.5">
+              Official Indian government emergency services and crisis dispatch hotlines. Tap to copy dial codes immediately.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-travel-muted">
+            Standard: Bureau of Police Research & Development (BPR&D)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {[
+            {
+              code: '112',
+              title: 'National Emergency (ERSS)',
+              desc: 'Unified Emergency Response Support System (Police, Medical, Fire & Rescue).',
+              tag: 'Primary All-In-One',
+              highlight: true,
+            },
+            {
+              code: '1091',
+              title: 'Women Helpline in Distress',
+              desc: 'Dedicated 24/7 crisis intervention, transit safety, and women rescue response.',
+              tag: 'Women Safety',
+            },
+            {
+              code: '100',
+              title: 'Police Assistance Control',
+              desc: 'State and city police quick dispatch control rooms.',
+              tag: 'Law Enforcement',
+            },
+            {
+              code: '108',
+              title: 'Emergency Medical & Ambulance',
+              desc: 'Toll-free emergency medical transit, trauma care, and hospital triage (or dial 102).',
+              tag: 'Medical Relief',
+            },
+            {
+              code: '101',
+              title: 'Fire & Rescue Services',
+              desc: 'Emergency fire stations, structural rescue, and hazmat response.',
+              tag: 'Fire Rescue',
+            },
+            {
+              code: '1078',
+              title: 'National Disaster Response (NDRF)',
+              desc: 'Specialized response for severe flood, cyclonic hazard, earthquake, or landslide crisis.',
+              tag: 'Disaster Relief',
+            },
+            {
+              code: '139',
+              title: 'RailMadad & IRCTC Security',
+              desc: '24/7 Indian Railways security assistance, medical relief on trains, and passenger inquiry.',
+              tag: 'Rail Security',
+            },
+          ].map((helpline) => (
+            <div
+              key={helpline.code}
+              className={`p-4 rounded-xl border flex flex-col justify-between gap-2.5 transition ${
+                helpline.highlight
+                  ? 'bg-rose-500/5 border-rose-500/30 ring-1 ring-rose-500/20'
+                  : 'bg-travel-subtle border-travel hover:bg-travel-card'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-mono font-black text-rose-500">
+                    {helpline.code}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-travel-card text-travel-secondary border border-travel">
+                    {helpline.tag}
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-travel-primary mt-1">{helpline.title}</h4>
+                <p className="text-[11px] text-travel-secondary leading-relaxed mt-1">
+                  {helpline.desc}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-travel flex items-center justify-between">
+                <a
+                  href={`tel:${helpline.code}`}
+                  className="text-[11px] font-bold text-travel-accent hover:underline flex items-center gap-1"
+                >
+                  <PhoneCall className="w-3 h-3" />
+                  <span>Call {helpline.code}</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(helpline.code, helpline.title)}
+                  className="px-2.5 py-1 rounded-lg bg-travel-card hover:bg-travel-accent-soft text-travel-secondary hover:text-travel-accent border border-travel text-[11px] font-semibold transition flex items-center gap-1 active:scale-95"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. TRUSTED CONTACTS MANAGEMENT (Full CRUD: Add, Edit, Remove) */}
+      <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-travel pb-4">
+          <div>
+            <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-travel-accent" />
               Trusted Emergency Contacts Management
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-travel-muted mt-0.5">
               Manage verified family, traveling companions, and concierges who receive simulated distress alerts.
             </p>
           </div>
@@ -350,7 +463,7 @@ export default function SafetyCenterPage() {
               setFormError('');
               setIsAddContactModalOpen(true);
             }}
-            className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20 shrink-0 self-start sm:self-center"
+            className="px-4 py-2 rounded-xl btn-travel-primary font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-sm shrink-0 self-start sm:self-center"
           >
             <UserPlus className="w-4 h-4" />
             Add Trusted Contact
@@ -359,10 +472,10 @@ export default function SafetyCenterPage() {
 
         {/* Contacts List Grid */}
         {trustedContacts.length === 0 ? (
-          <div className="text-center py-8 bg-slate-900/40 rounded-xl border border-slate-800/80 p-6 space-y-2">
-            <UserCheck className="w-8 h-8 text-teal-400/50 mx-auto" />
-            <h4 className="text-sm font-bold text-white">No Emergency Contacts Registered</h4>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+          <div className="text-center py-8 bg-travel-subtle/40 rounded-xl border border-travel/80 p-6 space-y-2">
+            <UserCheck className="w-8 h-8 text-travel-accent/50 mx-auto" />
+            <h4 className="text-sm font-bold text-travel-primary">No Emergency Contacts Registered</h4>
+            <p className="text-xs text-travel-muted max-w-sm mx-auto">
               Add trusted friends, family, or travel partners to receive simulated distress telemetry if you trigger an SOS.
             </p>
           </div>
@@ -371,42 +484,42 @@ export default function SafetyCenterPage() {
             {trustedContacts.map((contact) => (
               <div
                 key={contact.id || contact._id}
-                className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 hover:border-slate-600 transition flex flex-col justify-between space-y-3"
+                className="bg-travel-subtle/40 rounded-xl p-4 border border-travel/60 hover:border-slate-600 transition flex flex-col justify-between space-y-3"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-extrabold text-white truncate" title={contact.name}>
+                    <h4 className="text-sm font-extrabold text-travel-primary truncate" title={contact.name}>
                       {contact.name}
                     </h4>
                     <span
                       className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0 ${
                         contact.notifyOnSos !== false
                           ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                          : 'bg-slate-700 text-slate-400'
+                          : 'bg-travel-subtle text-travel-muted'
                       }`}
                     >
                       {contact.notifyOnSos !== false ? 'SOS Alert Recipient' : 'Excluded from SOS'}
                     </span>
                   </div>
 
-                  <div className="text-xs text-slate-400 font-medium">
+                  <div className="text-xs text-travel-muted font-medium">
                     {contact.relation || 'Emergency Contact'}
                   </div>
 
-                  <div className="font-mono text-teal-400 text-xs font-semibold pt-1">
+                  <div className="font-mono text-travel-accent text-xs font-semibold pt-1">
                     {contact.phone}
                   </div>
 
                   {contact.email && (
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
+                    <div className="text-[11px] text-travel-muted truncate font-mono">
                       {contact.email}
                     </div>
                   )}
                 </div>
 
                 {/* Card Footer: Action Controls */}
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-slate-500 font-mono">
+                <div className="pt-2 border-t border-travel/80 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-travel-muted font-mono">
                     Channel: Simulated SMS
                   </span>
 
@@ -414,7 +527,7 @@ export default function SafetyCenterPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(contact)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+                      className="p-1.5 rounded-lg text-travel-muted hover:text-travel-primary hover:bg-travel-subtle transition"
                       title="Edit Contact"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -423,7 +536,7 @@ export default function SafetyCenterPage() {
                     <button
                       type="button"
                       onClick={() => setDeletingContact(contact)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition"
+                      className="p-1.5 rounded-lg text-travel-muted hover:text-rose-400 hover:bg-travel-subtle transition"
                       title="Remove Contact"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -439,11 +552,11 @@ export default function SafetyCenterPage() {
       {/* 4. DIGITAL ICE SAFETY VAULT & "I'M SAFE" CHECK-IN */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 2 Cols: Digital Medical & Identity ICE Vault */}
-        <div className="lg:col-span-2 bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div className="lg:col-span-2 bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-travel pb-3">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
                   <HeartPulse className="w-4 h-4 text-rose-400" />
                   Digital ICE Safety Vault (In Case of Emergency)
                 </h3>
@@ -451,11 +564,11 @@ export default function SafetyCenterPage() {
                   DEMONSTRATION SAMPLE RECORD
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-travel-muted mt-1">
                 Emergency identity, blood type, and insurance telemetry disclosures prepared for first responders.
               </p>
             </div>
-            <span className="flex items-center gap-1 text-[11px] text-teal-400 font-mono bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20 self-start sm:self-center">
+            <span className="flex items-center gap-1 text-[11px] text-travel-accent font-mono bg-travel-accent-soft px-2 py-0.5 rounded border border-travel self-start sm:self-center">
               <Lock className="w-3 h-3" />
               Client Encrypted
             </span>
@@ -471,53 +584,53 @@ export default function SafetyCenterPage() {
 
           {/* Medical Specs Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Cardholder</span>
-              <span className="font-bold text-white text-xs block mt-0.5">{user?.name || SAFETY_ICE_VAULT.cardHolder}</span>
-              <span className="text-[10px] text-slate-400 font-mono">DOB: {SAFETY_ICE_VAULT.dob}</span>
+            <div className="bg-travel-subtle p-3 rounded-xl border border-travel/50">
+              <span className="text-[10px] text-travel-muted uppercase font-semibold block">Cardholder</span>
+              <span className="font-bold text-travel-primary text-xs block mt-0.5">{user?.name || SAFETY_ICE_VAULT.cardHolder}</span>
+              <span className="text-[10px] text-travel-muted font-mono">DOB: {SAFETY_ICE_VAULT.dob}</span>
             </div>
 
-            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Blood Group</span>
+            <div className="bg-travel-subtle p-3 rounded-xl border border-travel/50">
+              <span className="text-[10px] text-travel-muted uppercase font-semibold block">Blood Group</span>
               <span className="font-mono font-black text-rose-400 text-base block mt-0.5">
                 {SAFETY_ICE_VAULT.bloodType}
               </span>
               <span className="text-[10px] text-emerald-400 font-semibold">Organ Donor: Yes</span>
             </div>
 
-            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Known Allergies</span>
+            <div className="bg-travel-subtle p-3 rounded-xl border border-travel/50">
+              <span className="text-[10px] text-travel-muted uppercase font-semibold block">Known Allergies</span>
               <div className="font-bold text-amber-300 text-xs mt-0.5">
                 {SAFETY_ICE_VAULT.allergies.join(', ')}
               </div>
             </div>
 
-            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Passport Backup</span>
-              <span className="font-mono text-slate-200 text-xs block mt-0.5">
+            <div className="bg-travel-subtle p-3 rounded-xl border border-travel/50">
+              <span className="text-[10px] text-travel-muted uppercase font-semibold block">Passport Backup</span>
+              <span className="font-mono text-travel-secondary text-xs block mt-0.5">
                 {SAFETY_ICE_VAULT.passportNumberMasked}
               </span>
-              <span className="text-[10px] text-teal-400 font-mono">Exp: {SAFETY_ICE_VAULT.passportExpiry}</span>
+              <span className="text-[10px] text-travel-accent font-mono">Exp: {SAFETY_ICE_VAULT.passportExpiry}</span>
             </div>
           </div>
 
           {/* Insurance Policy Banner */}
-          <div className="bg-teal-950/20 border border-teal-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="bg-travel-subtle/20 border border-travel rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-white">{SAFETY_ICE_VAULT.insuranceProvider}</span>
-                <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.2 rounded font-mono font-semibold">
+                <span className="font-bold text-travel-primary">{SAFETY_ICE_VAULT.insuranceProvider}</span>
+                <span className="text-[10px] bg-travel-accent-soft text-travel-accent px-2 py-0.2 rounded font-mono font-semibold">
                   Policy: {SAFETY_ICE_VAULT.insurancePolicyNumber}
                 </span>
               </div>
-              <div className="text-slate-400 text-[11px] mt-1">
+              <div className="text-travel-muted text-[11px] mt-1">
                 24/7 Global Medical Hotline: {SAFETY_ICE_VAULT.insuranceHotline}
               </div>
             </div>
 
             <button
               onClick={() => copyToClipboard(SAFETY_ICE_VAULT.insurancePolicyNumber, 'Policy Number')}
-              className="px-3 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 font-semibold text-xs transition flex items-center gap-1.5 self-start sm:self-center"
+              className="px-3 py-1.5 rounded-lg btn-travel-secondary font-semibold text-xs transition flex items-center gap-1.5 self-start sm:self-center"
             >
               <Copy className="w-3.5 h-3.5" />
               Copy Policy #
@@ -526,20 +639,20 @@ export default function SafetyCenterPage() {
         </div>
 
         {/* 1 Col: Simulated "I'm Safe" Check-In Ping Tool & Past Logs */}
-        <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
+        <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-teal-400" />
+            <div className="border-b border-travel pb-3">
+              <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-travel-accent" />
                 "I'm Safe" Check-In Ping
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-travel-muted mt-0.5">
                 Simulate a one-tap safety reassurance check-in to your family and cloud itinerary.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-travel-secondary mb-1">
                 Optional Status Note
               </label>
               <input
@@ -547,7 +660,7 @@ export default function SafetyCenterPage() {
                 value={customPingNote}
                 onChange={(e) => setCustomPingNote(e.target.value)}
                 placeholder="e.g. Arrived safely at hotel, battery 90%..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                className="w-full bg-travel-subtle border border-travel rounded-xl px-3 py-2 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent"
               />
             </div>
 
@@ -556,7 +669,7 @@ export default function SafetyCenterPage() {
                 sendSafetyCheckInPing(customPingNote);
                 setCustomPingNote('');
               }}
-              className="w-full py-2.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95"
+              className="w-full py-2.5 px-4 rounded-xl btn-travel-primary font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-sm active:scale-95"
             >
               <CheckCircle2 className="w-4 h-4" />
               Send Safe Ping Now
@@ -564,25 +677,25 @@ export default function SafetyCenterPage() {
           </div>
 
           {/* Past Check-ins Log */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+          <div className="space-y-2 pt-2 border-t border-travel">
+            <span className="text-[11px] font-bold text-travel-muted uppercase tracking-wider block">
               Recent Ping Log
             </span>
 
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
               {checkInLogs.length === 0 ? (
-                <p className="text-slate-500 text-xs italic py-2">No safety pings broadcast yet. Use the button above to test a ping.</p>
+                <p className="text-travel-muted text-xs italic py-2">No safety pings broadcast yet. Use the button above to test a ping.</p>
               ) : (
                 checkInLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40 text-xs space-y-0.5"
+                    className="p-2.5 rounded-xl bg-travel-subtle/40 border border-travel/40 text-xs space-y-0.5"
                   >
-                    <div className="flex items-center justify-between text-slate-300 font-semibold">
+                    <div className="flex items-center justify-between text-travel-secondary font-semibold">
                       <span className="truncate">{log.location}</span>
-                      <span className="text-[10px] text-teal-400 font-mono">{log.timestamp}</span>
+                      <span className="text-[10px] text-travel-accent font-mono">{log.timestamp}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 italic">"{log.note}"</p>
+                    <p className="text-[11px] text-travel-muted italic">"{log.note}"</p>
                   </div>
                 ))
               )}
@@ -592,44 +705,44 @@ export default function SafetyCenterPage() {
       </div>
 
       {/* 5. PRIVACY & SAFETY ARCHITECTURE EXPLANATION */}
-      <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex items-center gap-2.5 border-b border-slate-800 pb-3">
-          <Shield className="w-5 h-5 text-teal-400" />
+      <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-travel pb-3">
+          <Shield className="w-5 h-5 text-travel-accent" />
           <div>
-            <h3 className="text-base font-bold text-white">
+            <h3 className="text-base font-bold text-travel-primary">
               TripMate Safety & Privacy Architecture
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-travel-muted mt-0.5">
               Transparent safeguards designed to prevent false alarms, protect user privacy, and ensure local data control.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-1.5">
-            <div className="font-extrabold text-teal-300 text-xs">Zero Real Dispatch</div>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
+          <div className="bg-travel-subtle/40 p-4 rounded-xl border border-travel/60 space-y-1.5">
+            <div className="font-extrabold text-travel-accent text-xs">Zero Real Dispatch</div>
+            <p className="text-travel-secondary text-[11px] leading-relaxed">
               Real-world 911/112/110 emergency services are <strong>never contacted</strong>. Simulated broadcasts operate strictly inside your browser sandbox to verify payload readiness safely.
             </p>
           </div>
 
-          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-1.5">
-            <div className="font-extrabold text-teal-300 text-xs">Zero SMS Charges</div>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
+          <div className="bg-travel-subtle/40 p-4 rounded-xl border border-travel/60 space-y-1.5">
+            <div className="font-extrabold text-travel-accent text-xs">Zero SMS Charges</div>
+            <p className="text-travel-secondary text-[11px] leading-relaxed">
               Emergency contacts will not receive unexpected carrier SMS messages or tolls. All dispatch cards show simulated payload previews.
             </p>
           </div>
 
-          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-1.5">
-            <div className="font-extrabold text-teal-300 text-xs">No Background Tracking</div>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
+          <div className="bg-travel-subtle/40 p-4 rounded-xl border border-travel/60 space-y-1.5">
+            <div className="font-extrabold text-travel-accent text-xs">No Background Tracking</div>
+            <p className="text-travel-secondary text-[11px] leading-relaxed">
               TripMate does <strong>not run continuous background GPS tracking</strong>. Mock location coordinates are strictly simulated demo records.
             </p>
           </div>
 
-          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-1.5">
-            <div className="font-extrabold text-teal-300 text-xs">Local Browser Storage</div>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
+          <div className="bg-travel-subtle/40 p-4 rounded-xl border border-travel/60 space-y-1.5">
+            <div className="font-extrabold text-travel-accent text-xs">Local Browser Storage</div>
+            <p className="text-travel-secondary text-[11px] leading-relaxed">
               Your ICE vault disclosures, trusted contacts, and safe zones remain inside your private local storage. No unencrypted server transmission.
             </p>
           </div>
@@ -637,14 +750,14 @@ export default function SafetyCenterPage() {
       </div>
 
       {/* 6. EMBASSY & CONSULATE DIRECTORY */}
-      <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+      <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-travel pb-3">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <PhoneCall className="w-4 h-4 text-teal-400" />
+            <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
+              <PhoneCall className="w-4 h-4 text-travel-accent" />
               Consular & Diplomatic Missions Directory
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-travel-muted mt-0.5">
               Verified 24/7 citizen services hotlines and disaster assistance protocols.
             </p>
           </div>
@@ -655,7 +768,7 @@ export default function SafetyCenterPage() {
               value={embassySearch}
               onChange={(e) => setEmbassySearch(e.target.value)}
               placeholder="Filter by country or city..."
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-travel-subtle border border-travel rounded-xl px-3 py-1.5 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent"
             />
           </div>
         </div>
@@ -664,33 +777,33 @@ export default function SafetyCenterPage() {
           {filteredEmbassies.map((emb, idx) => (
             <div
               key={idx}
-              className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 space-y-3"
+              className="bg-travel-subtle/40 rounded-xl p-4 border border-travel/60 space-y-3"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider block">
+                  <span className="text-[10px] text-travel-accent font-bold uppercase tracking-wider block">
                     {emb.country}
                   </span>
-                  <h4 className="text-sm font-bold text-white">{emb.representation}</h4>
-                  <span className="text-xs text-slate-400">{emb.city}</span>
+                  <h4 className="text-sm font-bold text-travel-primary">{emb.representation}</h4>
+                  <span className="text-xs text-travel-muted">{emb.city}</span>
                 </div>
 
                 <button
                   onClick={() => copyToClipboard(emb.hotline24h, `${emb.country} Hotline`)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-teal-300 text-[11px] font-mono transition flex items-center gap-1 shrink-0"
+                  className="px-2.5 py-1 rounded-lg bg-travel-subtle hover:bg-travel-card text-travel-accent text-[11px] font-mono transition flex items-center gap-1 shrink-0"
                 >
                   <Copy className="w-3 h-3" />
                   Copy
                 </button>
               </div>
 
-              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-400">24/7 Emergency Line:</span>
-                <span className="font-mono font-bold text-white text-xs">{emb.hotline24h}</span>
+              <div className="bg-travel-subtle p-2.5 rounded-lg border border-travel flex items-center justify-between text-xs">
+                <span className="text-travel-muted">24/7 Emergency Line:</span>
+                <span className="font-mono font-bold text-travel-primary text-xs">{emb.hotline24h}</span>
               </div>
 
-              <div className="text-[11px] text-slate-400">
-                <strong className="text-slate-300">Services:</strong> {emb.services.join(' • ')}
+              <div className="text-[11px] text-travel-muted">
+                <strong className="text-travel-secondary">Services:</strong> {emb.services.join(' • ')}
               </div>
             </div>
           ))}
@@ -698,13 +811,13 @@ export default function SafetyCenterPage() {
       </div>
 
       {/* 7. OFFLINE CRISIS CHECKLISTS (Accordion) */}
-      <div className="bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
-        <div className="border-b border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-teal-400" />
+      <div className="bg-travel-card rounded-2xl p-6 border border-travel shadow-xl space-y-4">
+        <div className="border-b border-travel pb-3">
+          <h3 className="text-base font-bold text-travel-primary flex items-center gap-2">
+            <FileText className="w-4 h-4 text-travel-accent" />
             Offline Survival & Crisis Checklists
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-travel-muted mt-0.5">
             Step-by-step procedures when offline, experiencing passport loss, sudden medical illness, or natural events.
           </p>
         </div>
@@ -715,29 +828,29 @@ export default function SafetyCenterPage() {
             return (
               <div
                 key={idx}
-                className="bg-slate-800/40 rounded-xl border border-slate-700/60 overflow-hidden"
+                className="bg-travel-subtle/40 rounded-xl border border-travel/60 overflow-hidden"
               >
                 <button
                   type="button"
                   onClick={() => setExpandedChecklist(isExpanded ? null : idx)}
-                  className="w-full p-4 flex items-center justify-between text-left text-xs font-bold text-white hover:bg-slate-800 transition"
+                  className="w-full p-4 flex items-center justify-between text-left text-xs font-bold text-travel-primary hover:bg-travel-subtle transition"
                 >
                   <span className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-400" />
                     {guide.category}
                   </span>
                   {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-slate-400" />
+                    <ChevronUp className="w-4 h-4 text-travel-muted" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                    <ChevronDown className="w-4 h-4 text-travel-muted" />
                   )}
                 </button>
 
                 {isExpanded && (
-                  <div className="p-4 pt-1 border-t border-slate-800 text-xs text-slate-300 space-y-2 bg-slate-900/60">
+                  <div className="p-4 pt-1 border-t border-travel text-xs text-travel-secondary space-y-2 bg-travel-subtle/60">
                     <ul className="list-decimal list-inside space-y-1.5 leading-relaxed">
                       {guide.tips.map((tip, tIdx) => (
-                        <li key={tIdx} className="text-slate-300">
+                        <li key={tIdx} className="text-travel-secondary">
                           {tip}
                         </li>
                       ))}
@@ -769,7 +882,7 @@ export default function SafetyCenterPage() {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-travel-secondary mb-1">
                 Full Name *
               </label>
               <input
@@ -778,13 +891,13 @@ export default function SafetyCenterPage() {
                 value={contactForm.name}
                 onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                 placeholder="e.g. Morgan Sterling"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2 text-xs text-travel-primary focus:outline-none focus:border-travel-accent"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-travel-secondary mb-1">
                   Relationship *
                 </label>
                 <input
@@ -793,12 +906,12 @@ export default function SafetyCenterPage() {
                   value={contactForm.relation}
                   onChange={(e) => setContactForm({ ...contactForm, relation: e.target.value })}
                   placeholder="e.g. Spouse / Brother / Friend"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2 text-xs text-travel-primary focus:outline-none focus:border-travel-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-travel-secondary mb-1">
                   Mobile Phone Number *
                 </label>
                 <input
@@ -807,13 +920,13 @@ export default function SafetyCenterPage() {
                   value={contactForm.phone}
                   onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                   placeholder="+1 (415) 555-0192"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2 text-xs text-travel-primary font-mono focus:outline-none focus:border-travel-accent"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-travel-secondary mb-1">
                 Email Address (Optional)
               </label>
               <input
@@ -821,7 +934,7 @@ export default function SafetyCenterPage() {
                 value={contactForm.email}
                 onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                 placeholder="contact@example.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2 text-xs text-travel-primary focus:outline-none focus:border-travel-accent"
               />
             </div>
 
@@ -831,27 +944,27 @@ export default function SafetyCenterPage() {
                 id="notifyOnSosCheckbox"
                 checked={contactForm.notifyOnSos}
                 onChange={(e) => setContactForm({ ...contactForm, notifyOnSos: e.target.checked })}
-                className="rounded border-slate-700 text-teal-500 focus:ring-teal-500 bg-slate-900 w-4 h-4"
+                className="rounded border-travel text-travel-accent focus:ring-[var(--accent-primary)] bg-travel-subtle w-4 h-4"
               />
-              <label htmlFor="notifyOnSosCheckbox" className="text-xs text-slate-300 font-medium cursor-pointer">
+              <label htmlFor="notifyOnSosCheckbox" className="text-xs text-travel-secondary font-medium cursor-pointer">
                 Include in Simulated Emergency SOS Broadcasts
               </label>
             </div>
 
-            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-800">
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-travel">
               <button
                 type="button"
                 onClick={() => {
                   setIsAddContactModalOpen(false);
                   setEditingContact(null);
                 }}
-                className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs text-travel-muted hover:text-travel-primary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition"
+                className="px-5 py-2 rounded-xl btn-travel-primary font-bold text-xs transition"
               >
                 {editingContact ? 'Save Changes' : 'Add Contact'}
               </button>
@@ -869,15 +982,15 @@ export default function SafetyCenterPage() {
           subtitle="Accidental removal protection."
         >
           <div className="space-y-4">
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Are you sure you want to remove <strong className="text-white">{deletingContact.name}</strong> ({deletingContact.phone}) from your emergency contacts? They will no longer receive simulated distress alerts.
+            <p className="text-xs text-travel-secondary leading-relaxed">
+              Are you sure you want to remove <strong className="text-travel-primary">{deletingContact.name}</strong> ({deletingContact.phone}) from your emergency contacts? They will no longer receive simulated distress alerts.
             </p>
 
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-travel">
               <button
                 type="button"
                 onClick={() => setDeletingContact(null)}
-                className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs text-travel-muted hover:text-travel-primary"
               >
                 Keep Contact
               </button>

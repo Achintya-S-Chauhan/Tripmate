@@ -75,7 +75,7 @@ export const getJourneyById = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new journey
+// @desc    Create a new journey / trip
 // @route   POST /api/journeys
 // @access  Private
 export const createJourney = async (req, res, next) => {
@@ -87,76 +87,56 @@ export const createJourney = async (req, res, next) => {
       travelDate,
       startDate,
       endDate,
+      isUndated,
       status,
+      currency,
       primaryTransportMode,
       transitTypes,
       summary,
+      notes,
       budget,
       segments,
+      stays,
+      places,
       waypoints,
       coverImage,
     } = req.body;
 
-    if (!title || !origin || !destination) {
+    if (!origin || !destination) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide journey title, origin, and destination.',
+        message: 'Please provide origin and destination.',
       });
     }
 
-    // Default starter segment if none provided
-    const initialSegments =
-      Array.isArray(segments) && segments.length > 0
-        ? segments
-        : [
-            {
-              id: 'seg-' + Date.now(),
-              order: 1,
-              type: (primaryTransportMode || '').toLowerCase().includes('bus')
-                ? 'bus'
-                : (primaryTransportMode || '').toLowerCase().includes('train')
-                ? 'train'
-                : 'walking',
-              mode: primaryTransportMode || 'Walking',
-              transportMode: primaryTransportMode || 'Walking',
-              title: `Primary Transit Leg: ${origin} to ${destination}`,
-              origin,
-              from: origin,
-              destination,
-              to: destination,
-              distanceKm: parseFloat(req.body.totalDistanceKm) || 4.5,
-              distanceMi: parseFloat(
-                ((parseFloat(req.body.totalDistanceKm) || 4.5) * 0.621371).toFixed(1)
-              ),
-              durationMinutes: parseInt(req.body.totalDurationMinutes, 10) || 30,
-              duration: `${parseInt(req.body.totalDurationMinutes, 10) || 30}m`,
-              startTime: '09:00 AM',
-              endTime: '09:30 AM',
-              co2SavedKg: 0.8,
-              status: status === 'In Progress' ? 'In Progress' : 'Scheduled',
-              notes: summary || 'Initial registered segment for this trip chain.',
-            },
-          ];
-
+    // New trips start clean with supplied segments or empty array
+    const initialSegments = Array.isArray(segments) ? segments : [];
     const totals = recalculateJourneyTotals(initialSegments);
+
+    const sDate = startDate || travelDate || null;
+    const eDate = endDate || null;
+    const isTripUndated = Boolean(isUndated || (!sDate && !eDate));
+
+    const finalTitle = title && title.trim() ? title.trim() : `${origin.trim()} ➔ ${destination.trim()}`;
 
     const journey = await Journey.create({
       user: req.user._id,
-      title: title.trim(),
+      title: finalTitle,
       origin: origin.trim(),
       destination: destination.trim(),
-      travelDate: travelDate || new Date().toISOString().split('T')[0],
-      startDate: startDate || travelDate || new Date().toISOString().split('T')[0],
-      endDate: endDate || travelDate || new Date().toISOString().split('T')[0],
+      travelDate: sDate || '',
+      startDate: sDate || '',
+      endDate: eDate || '',
+      isUndated: isTripUndated,
       status: status || 'Upcoming',
-      primaryTransportMode: primaryTransportMode || 'Transit + Walking',
-      transitTypes: transitTypes || [
-        (primaryTransportMode || 'transit').toLowerCase(),
-      ],
+      currency: currency || 'USD',
+      primaryTransportMode: primaryTransportMode || 'Multi-Modal',
+      transitTypes: transitTypes || ['multi-modal'],
       totalDistanceKm: totals.totalDistanceKm,
       totalDurationMinutes: totals.totalDurationMinutes,
       estimatedCo2Kg: totals.estimatedCo2Kg,
       summary: summary || '',
+      notes: notes || '',
       budget: parseFloat(budget) || 0,
       spent: 0,
       center: req.body.center || (waypoints && waypoints[0]?.coords) || [20, 0],
@@ -165,8 +145,11 @@ export const createJourney = async (req, res, next) => {
         coverImage ||
         'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
       waypoints: Array.isArray(waypoints) ? waypoints : [],
+      routeGeometry: Array.isArray(req.body.routeGeometry) ? req.body.routeGeometry : [],
       segments: initialSegments,
       travelSegments: initialSegments,
+      stays: Array.isArray(stays) ? stays : [],
+      places: Array.isArray(places) ? places : [],
     });
 
     res.status(201).json({
@@ -203,14 +186,19 @@ export const updateJourney = async (req, res, next) => {
       travelDate,
       startDate,
       endDate,
+      isUndated,
       status,
+      currency,
       primaryTransportMode,
       summary,
+      notes,
       budget,
       spent,
       coverImage,
       segments,
       travelSegments,
+      stays,
+      places,
       waypoints,
       packingList,
       itineraryDays,
@@ -222,16 +210,21 @@ export const updateJourney = async (req, res, next) => {
     if (title) journey.title = title.trim();
     if (origin) journey.origin = origin.trim();
     if (destination) journey.destination = destination.trim();
-    if (travelDate) journey.travelDate = travelDate;
-    if (startDate) journey.startDate = startDate;
-    if (endDate) journey.endDate = endDate;
+    if (travelDate !== undefined) journey.travelDate = travelDate;
+    if (startDate !== undefined) journey.startDate = startDate;
+    if (endDate !== undefined) journey.endDate = endDate;
+    if (isUndated !== undefined) journey.isUndated = Boolean(isUndated);
     if (status) journey.status = status;
+    if (currency) journey.currency = currency;
     if (primaryTransportMode) journey.primaryTransportMode = primaryTransportMode;
     if (summary !== undefined) journey.summary = summary;
+    if (notes !== undefined) journey.notes = notes;
     if (budget !== undefined) journey.budget = parseFloat(budget) || 0;
     if (spent !== undefined) journey.spent = parseFloat(spent) || 0;
     if (coverImage) journey.coverImage = coverImage;
     if (waypoints) journey.waypoints = waypoints;
+    if (stays) journey.stays = stays;
+    if (places) journey.places = places;
     if (packingList) journey.packingList = packingList;
     if (itineraryDays) journey.itineraryDays = itineraryDays;
     if (expenses) journey.expenses = expenses;
@@ -239,6 +232,7 @@ export const updateJourney = async (req, res, next) => {
     if (currentLocation) journey.currentLocation = currentLocation;
     if (req.body.center) journey.center = req.body.center;
     if (req.body.zoom) journey.zoom = req.body.zoom;
+    if (req.body.routeGeometry) journey.routeGeometry = req.body.routeGeometry;
 
     const newSegs = segments || travelSegments;
     if (Array.isArray(newSegs)) {
@@ -256,6 +250,44 @@ export const updateJourney = async (req, res, next) => {
       success: true,
       message: 'Journey updated successfully.',
       journey,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Duplicate an existing journey / trip
+// @route   POST /api/journeys/:id/duplicate
+// @access  Private
+export const duplicateJourney = async (req, res, next) => {
+  try {
+    const original = await Journey.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!original) {
+      return res.status(404).json({
+        success: false,
+        message: 'Original journey not found.',
+      });
+    }
+
+    const origObj = original.toObject();
+    delete origObj._id;
+    delete origObj.id;
+    delete origObj.createdAt;
+    delete origObj.updatedAt;
+
+    origObj.title = `${original.title} (Copy)`;
+    origObj.status = 'Draft';
+
+    const duplicated = await Journey.create(origObj);
+
+    res.status(201).json({
+      success: true,
+      message: 'Journey duplicated successfully.',
+      journey: duplicated,
     });
   } catch (error) {
     next(error);
@@ -316,8 +348,25 @@ export const addSegment = async (req, res, next) => {
       distanceKm,
       durationMinutes,
       startTime,
+      endTime,
+      departureDate,
+      arrivalDate,
+      departureStation,
+      arrivalStation,
+      operator,
+      serviceNumber,
+      transfers,
+      price,
+      currency,
+      costType,
+      bookingStatus,
+      bookingUrl,
+      source,
       transitLine,
       notes,
+      originCoords,
+      destinationCoords,
+      geometry,
     } = req.body;
 
     if (!title || !origin || !destination) {
@@ -327,8 +376,8 @@ export const addSegment = async (req, res, next) => {
       });
     }
 
-    const dist = parseFloat(distanceKm) || 1.0;
-    const dur = parseInt(durationMinutes, 10) || 15;
+    const dist = parseFloat(distanceKm) || 0;
+    const dur = parseInt(durationMinutes, 10) || 0;
     const order = (journey.segments?.length || 0) + 1;
 
     const newSegment = {
@@ -346,11 +395,28 @@ export const addSegment = async (req, res, next) => {
       distanceMi: parseFloat((dist * 0.621371).toFixed(1)),
       durationMinutes: dur,
       duration: `${dur}m`,
-      startTime: startTime || '10:00 AM',
+      startTime: startTime || '',
+      endTime: endTime || '',
+      departureDate: departureDate || journey.startDate || '',
+      arrivalDate: arrivalDate || journey.startDate || '',
+      departureStation: departureStation || '',
+      arrivalStation: arrivalStation || '',
+      operator: operator || '',
+      serviceNumber: serviceNumber || '',
+      transfers: parseInt(transfers, 10) || 0,
+      price: price != null ? parseFloat(price) : undefined,
+      currency: currency || journey.currency || 'USD',
+      costType: costType || 'planned',
+      bookingStatus: bookingStatus || 'planned',
+      bookingUrl: bookingUrl || '',
+      source: source || 'manual',
       transitLine: transitLine || null,
       co2SavedKg: parseFloat((dist * 0.12).toFixed(1)),
       status: 'Scheduled',
       notes: notes || '',
+      originCoords: originCoords || undefined,
+      destinationCoords: destinationCoords || undefined,
+      geometry: Array.isArray(geometry) ? geometry : [],
     };
 
     journey.segments.push(newSegment);
@@ -373,7 +439,7 @@ export const addSegment = async (req, res, next) => {
   }
 };
 
-// @desc    Update or delete segment in journey
+// @desc    Update segment in journey
 // @route   PUT /api/journeys/:id/segments/:segmentId
 // @access  Private
 export const updateSegment = async (req, res, next) => {
@@ -401,10 +467,10 @@ export const updateSegment = async (req, res, next) => {
     }
 
     Object.assign(segment, req.body);
-    if (req.body.distanceKm) {
-      segment.distanceMi = parseFloat((req.body.distanceKm * 0.621371).toFixed(1));
+    if (req.body.distanceKm != null) {
+      segment.distanceMi = parseFloat((Number(req.body.distanceKm) * 0.621371).toFixed(1));
     }
-    if (req.body.durationMinutes) {
+    if (req.body.durationMinutes != null) {
       segment.duration = `${req.body.durationMinutes}m`;
     }
 
@@ -477,4 +543,3 @@ export const deleteSegment = async (req, res, next) => {
     next(error);
   }
 };
-

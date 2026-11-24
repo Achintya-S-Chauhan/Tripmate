@@ -35,31 +35,28 @@ export default function DemoBanner() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-[#20080f] via-[#350b16] to-[#20080f] border-b-2 border-rose-500 text-rose-100 text-xs px-4 py-2.5 shadow-2xl relative z-40 animate-pulse-subtle">
+    <div className="bg-red-800 dark:bg-red-950 border-b border-red-700/60 text-white text-xs px-4 py-2 shadow-md relative z-40">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 max-w-7xl mx-auto">
         {/* Status & Location Details */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-600 text-white font-black tracking-wider text-[11px] uppercase shadow-md animate-pulse">
-            <Radio className="w-3.5 h-3.5" />
-            SIMULATED EMERGENCY SESSION ACTIVE
+          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-white font-bold tracking-wider text-[10px] uppercase">
+            <Radio className="w-3 h-3 animate-spin" />
+            Simulated Emergency Session Active
           </span>
 
-          <div className="flex items-center gap-1.5 text-rose-200 font-mono text-[11px] bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-800/60">
-            <Clock className="w-3.5 h-3.5 text-rose-400" />
+          <div className="flex items-center gap-1.5 text-white/90 font-mono text-[11px] bg-black/20 px-2 py-0.5 rounded-md border border-white/10">
+            <Clock className="w-3 h-3" />
             <span>Elapsed: {formatElapsed(emergencySession.elapsedSeconds)}</span>
           </div>
 
-          <div className="hidden lg:flex items-center gap-1.5 text-slate-300 text-[11px]">
-            <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+          <div className="hidden lg:flex items-center gap-1.5 text-white/80 text-[11px]">
+            <MapPin className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate max-w-xs font-medium">
               Sample: {sampleLoc?.name || 'Kyoto Safe Transit'}
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              ({sampleLoc?.coords ? sampleLoc.coords.join(', ') : '35.0037, 135.7770'})
-            </span>
           </div>
 
-          <span className="hidden sm:inline-block text-[11px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30 font-semibold">
+          <span className="hidden sm:inline-block text-[11px] bg-white/10 text-white px-2 py-0.5 rounded font-mono">
             {deliveredCount} Mock Alerts Simulated
           </span>
         </div>
@@ -69,7 +66,7 @@ export default function DemoBanner() {
           <button
             type="button"
             onClick={() => setActivePage('safety')}
-            className="px-3 py-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-900 text-rose-200 border border-rose-700/60 text-[11px] font-bold transition flex items-center gap-1"
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition flex items-center gap-1"
           >
             <ExternalLink className="w-3 h-3" />
             Safety Center
@@ -78,17 +75,17 @@ export default function DemoBanner() {
           <button
             type="button"
             onClick={endEmergencySession}
-            className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] tracking-wide transition flex items-center gap-1.5 shadow-lg shadow-rose-600/30 active:scale-95"
+            className="px-3 py-1 rounded-lg bg-white text-red-900 font-bold text-[11px] transition flex items-center gap-1 shadow-sm active:scale-95"
           >
-            <StopCircle className="w-3.5 h-3.5" />
-            End Emergency Session
+            <StopCircle className="w-3 h-3" />
+            End Session
           </button>
         </div>
       </div>
 
       {/* Transparent Disclaimer */}
-      <div className="text-[10px] text-rose-300/80 text-center pt-1 font-mono tracking-tight hidden sm:block">
-        * Demonstration Sandbox: Real emergency lines and live telecom carriers are NEVER contacted.
+      <div className="text-[10px] text-white/70 text-center pt-0.5 font-mono hidden sm:block">
+        * Demonstration Sandbox: Real emergency dispatch lines (112 / 911 / 110) are never contacted.
       </div>
     </div>
   );

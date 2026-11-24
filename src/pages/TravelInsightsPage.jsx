@@ -128,21 +128,21 @@ const EMISSION_PRESETS = [
   },
 ];
 
-// Custom sleek dark tooltip for Recharts
+// Custom sleek tooltip for Recharts
 const SleekChartTooltip = ({ active, payload, label, unit = '' }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#0b1120] border border-slate-700/90 p-3 rounded-xl shadow-2xl text-xs space-y-1.5 backdrop-blur-md">
-        <div className="font-bold text-white border-b border-slate-800 pb-1 flex items-center justify-between gap-3">
+      <div className="bg-travel-card border border-travel p-3 rounded-xl shadow-elevated text-xs space-y-1.5 backdrop-blur-md">
+        <div className="font-bold text-travel-primary border-b border-travel pb-1 flex items-center justify-between gap-3">
           <span>{label}</span>
         </div>
         {payload.map((entry, index) => (
           <div key={`entry-${index}`} className="flex items-center justify-between gap-4">
-            <span style={{ color: entry.color || '#14b8a6' }} className="font-semibold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || '#14b8a6' }} />
+            <span style={{ color: entry.color || 'var(--accent-primary)' }} className="font-semibold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || 'var(--accent-primary)' }} />
               {entry.name}:
             </span>
-            <span className="font-mono font-bold text-white">
+            <span className="font-mono font-bold text-travel-primary">
               {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value} {entry.unit || unit}
             </span>
           </div>
@@ -512,7 +512,7 @@ export default function TravelInsightsPage() {
     if (trainMode && trainMode.km > 5) {
       list.push({
         id: 'rail_champion',
-        icon: <Train className="w-4 h-4 text-teal-400" />,
+        icon: <Train className="w-4 h-4 text-travel-accent" />,
         badge: 'Low-Carbon Backbone',
         badgeColor: 'teal',
         title: 'High-Speed Rail Efficiency',
@@ -524,7 +524,7 @@ export default function TravelInsightsPage() {
     if (busMode && busMode.km > 0) {
       list.push({
         id: 'bus_transit',
-        icon: <Bus className="w-4 h-4 text-cyan-400" />,
+        icon: <Bus className="w-4 h-4 text-travel-accent" />,
         badge: 'Mass Transit',
         badgeColor: 'cyan',
         title: 'First-Mile Public Transit Optimization',
@@ -672,11 +672,11 @@ export default function TravelInsightsPage() {
       {/* 1. Header & Selectable Date Range Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-            <BarChart3 className="w-6 h-6 text-teal-400" />
+          <h2 className="text-2xl font-black text-travel-primary tracking-tight flex items-center gap-2.5">
+            <BarChart3 className="w-6 h-6 text-travel-accent" />
             Travel & Mobility Insights
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-travel-muted mt-1">
             Multimodal transit telemetry, daily activity timeline, and verified example emission modeling.
           </p>
         </div>
@@ -689,17 +689,17 @@ export default function TravelInsightsPage() {
               setFactorFormState(emissionFactors);
               setIsFactorModalOpen(true);
             }}
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold border border-slate-700/80 transition flex items-center gap-1.5 shadow-sm active:scale-95"
+            className="px-3 py-2 rounded-xl bg-travel-subtle hover:bg-travel-subtle text-travel-accent text-xs font-semibold border border-travel/80 transition flex items-center gap-1.5 shadow-sm active:scale-95"
             title="Configure documented emission factors"
           >
-            <Sliders className="w-3.5 h-3.5 text-teal-400" />
+            <Sliders className="w-3.5 h-3.5 text-travel-accent" />
             <span className="hidden sm:inline">Configure</span> Factors
           </button>
 
           <button
             type="button"
             onClick={handleDownloadCsv}
-            className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20 active:scale-95"
+            className="px-3.5 py-2 rounded-xl btn-travel-primary text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-sm active:scale-95"
           >
             <Download className="w-3.5 h-3.5 stroke-[2.5]" />
             Download CSV Report
@@ -708,12 +708,12 @@ export default function TravelInsightsPage() {
       </div>
 
       {/* Date Range Preset Selector */}
-      <div className="bg-[#0f172a] p-3.5 rounded-2xl border border-slate-800 shadow-md space-y-3">
+      <div className="bg-travel-card p-3.5 rounded-2xl border border-travel shadow-md space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-300 font-semibold">
-            <Calendar className="w-4 h-4 text-teal-400" />
+          <div className="flex items-center gap-2 text-travel-secondary font-semibold">
+            <Calendar className="w-4 h-4 text-travel-accent" />
             <span>Select Date Range:</span>
-            <span className="text-[11px] font-mono text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20 font-bold">
+            <span className="text-[11px] font-mono text-travel-accent bg-travel-accent-soft px-2 py-0.5 rounded border border-travel font-bold">
               {dateRangeDescription}
             </span>
           </div>
@@ -734,8 +734,8 @@ export default function TravelInsightsPage() {
                 onClick={() => setDateRangePreset(preset.id)}
                 className={`px-3 py-1.5 rounded-xl font-semibold transition text-xs ${
                   dateRangePreset === preset.id
-                    ? 'bg-teal-500 text-slate-950 shadow-sm'
-                    : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700'
+                    ? 'btn-travel-primary shadow-sm'
+                    : 'bg-travel-subtle text-travel-muted hover:text-travel-primary hover:bg-travel-subtle'
                 }`}
               >
                 {preset.label}
@@ -746,24 +746,24 @@ export default function TravelInsightsPage() {
 
         {/* Custom Date Inputs (when 'custom' preset is active) */}
         {dateRangePreset === 'custom' && (
-          <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-3 text-xs">
+          <div className="pt-2 border-t border-travel flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <label className="text-slate-400">Start Date:</label>
+              <label className="text-travel-muted">Start Date:</label>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                className="bg-travel-subtle border border-travel rounded-xl px-2.5 py-1 text-travel-primary font-mono text-xs focus:outline-none focus:border-travel-accent"
               />
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-slate-400">End Date:</label>
+              <label className="text-travel-muted">End Date:</label>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                className="bg-travel-subtle border border-travel rounded-xl px-2.5 py-1 text-travel-primary font-mono text-xs focus:outline-none focus:border-travel-accent"
               />
             </div>
 
@@ -780,48 +780,48 @@ export default function TravelInsightsPage() {
       {/* 2. Top Aggregate Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Distance Card */}
-        <div className="bg-[#0f172a] p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="bg-travel-card p-4 sm:p-5 rounded-2xl border border-travel shadow-md flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between text-xs text-travel-muted">
             <span className="uppercase tracking-wider font-bold text-[10px]">Total Distance</span>
-            <Compass className="w-4 h-4 text-teal-400" />
+            <Compass className="w-4 h-4 text-travel-accent" />
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl sm:text-3xl font-black text-travel-primary font-mono tracking-tight">
               {metrics.totalDistanceDisplay.toLocaleString()}{' '}
-              <span className="text-sm font-normal text-slate-400">{distUnit}</span>
+              <span className="text-sm font-normal text-travel-muted">{distUnit}</span>
             </div>
-            <div className="text-[11px] text-teal-300/90 mt-1 font-medium">
+            <div className="text-[11px] text-travel-accent/90 mt-1 font-medium">
               Across {metrics.totalJourneys} active trip chains
             </div>
           </div>
         </div>
 
         {/* Total Travel Time Card */}
-        <div className="bg-[#0f172a] p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="bg-travel-card p-4 sm:p-5 rounded-2xl border border-travel shadow-md flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between text-xs text-travel-muted">
             <span className="uppercase tracking-wider font-bold text-[10px]">Total Travel Time</span>
-            <Clock className="w-4 h-4 text-cyan-400" />
+            <Clock className="w-4 h-4 text-travel-accent" />
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl sm:text-3xl font-black text-travel-primary font-mono tracking-tight">
               {metrics.totalDurationFormatted}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-mono">
+            <div className="text-[11px] text-travel-muted mt-1 font-mono">
               {metrics.totalDurationMinutes.toLocaleString()} minutes transit time
             </div>
           </div>
         </div>
 
         {/* Journey Count & Average Duration Card */}
-        <div className="bg-[#0f172a] p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="bg-travel-card p-4 sm:p-5 rounded-2xl border border-travel shadow-md flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between text-xs text-travel-muted">
             <span className="uppercase tracking-wider font-bold text-[10px]">Journeys Logged</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl sm:text-3xl font-black text-travel-primary font-mono tracking-tight">
               {metrics.totalJourneys}{' '}
-              <span className="text-sm font-normal text-slate-400">Journeys</span>
+              <span className="text-sm font-normal text-travel-muted">Journeys</span>
             </div>
             <div className="text-[11px] text-emerald-400 mt-1 font-medium">
               Avg duration: {metrics.avgDurationMins}m per trip
@@ -830,15 +830,15 @@ export default function TravelInsightsPage() {
         </div>
 
         {/* Net Estimated CO2 Emissions Card */}
-        <div className="bg-[#0f172a] p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="bg-travel-card p-4 sm:p-5 rounded-2xl border border-travel shadow-md flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between text-xs text-travel-muted">
             <span className="uppercase tracking-wider font-bold text-[10px]">Estimated Emissions</span>
             <Leaf className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl sm:text-3xl font-black text-travel-primary font-mono tracking-tight">
               {metrics.totalEstimatedCo2Kg}{' '}
-              <span className="text-sm font-normal text-slate-400">kg CO₂</span>
+              <span className="text-sm font-normal text-travel-muted">kg CO₂</span>
             </div>
             <div className="text-[11px] text-emerald-300 mt-1 font-semibold flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-emerald-400" />
@@ -850,13 +850,13 @@ export default function TravelInsightsPage() {
 
       {/* Empty State when no journeys match filter */}
       {metrics.totalJourneys === 0 ? (
-        <div className="bg-[#0f172a] rounded-2xl border border-slate-800 p-10 text-center space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400">
+        <div className="bg-travel-card rounded-2xl border border-travel p-10 text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-travel-subtle border border-travel flex items-center justify-center text-travel-muted">
             <Calendar className="w-7 h-7" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white">No Journeys in Selected Date Range</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
+            <h3 className="text-lg font-bold text-travel-primary">No Journeys in Selected Date Range</h3>
+            <p className="text-xs text-travel-muted max-w-md mx-auto">
               There are no recorded travel chains between {dateRangeDescription}. Switch your date range or create a new journey.
             </p>
           </div>
@@ -864,14 +864,14 @@ export default function TravelInsightsPage() {
             <button
               type="button"
               onClick={() => setDateRangePreset('all')}
-              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition"
+              className="px-4 py-2 rounded-xl btn-travel-primary font-bold text-xs transition"
             >
               Reset to All Time
             </button>
             <button
               type="button"
               onClick={() => setActivePage('journeys')}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition"
+              className="px-4 py-2 rounded-xl bg-travel-subtle hover:bg-travel-subtle text-travel-primary font-semibold text-xs border border-travel transition"
             >
               Go to My Journeys
             </button>
@@ -882,27 +882,27 @@ export default function TravelInsightsPage() {
           {/* 3. Row 1: Daily Travel Distance Time-Series Chart & Transport-Mode Split */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Daily Travel Distance Time-Series Chart (2 cols) */}
-            <div className="lg:col-span-2 bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="lg:col-span-2 bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4 flex flex-col justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-travel pb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-travel-accent" />
                     Daily Travel Distance & Activity Time-Series
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-travel-muted mt-0.5">
                     Chronological progression of mobility records across the selected period.
                   </p>
                 </div>
 
                 {/* Metric toggle */}
-                <div className="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center gap-1 text-xs shrink-0">
+                <div className="bg-travel-subtle p-1 rounded-xl border border-travel flex items-center gap-1 text-xs shrink-0">
                   <button
                     type="button"
                     onClick={() => setTimeSeriesMetric('distance')}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
                       timeSeriesMetric === 'distance'
-                        ? 'bg-teal-500 text-slate-950 shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'btn-travel-primary shadow-sm'
+                        : 'text-travel-muted hover:text-travel-primary'
                     }`}
                   >
                     Distance ({distUnit})
@@ -912,8 +912,8 @@ export default function TravelInsightsPage() {
                     onClick={() => setTimeSeriesMetric('time')}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
                       timeSeriesMetric === 'time'
-                        ? 'bg-teal-500 text-slate-950 shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'btn-travel-primary shadow-sm'
+                        : 'text-travel-muted hover:text-travel-primary'
                     }`}
                   >
                     Time (min)
@@ -923,8 +923,8 @@ export default function TravelInsightsPage() {
                     onClick={() => setTimeSeriesMetric('co2')}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
                       timeSeriesMetric === 'co2'
-                        ? 'bg-teal-500 text-slate-950 shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'btn-travel-primary shadow-sm'
+                        : 'text-travel-muted hover:text-travel-primary'
                     }`}
                   >
                     CO₂ (kg)
@@ -941,13 +941,13 @@ export default function TravelInsightsPage() {
                   >
                     <defs>
                       <linearGradient id="timeSeriesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.45} />
-                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.0} />
+                        <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
-                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                    <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={11} tickLine={false} />
+                    <YAxis stroke="var(--text-secondary)" fontSize={11} tickLine={false} />
                     <Tooltip
                       content={
                         <SleekChartTooltip
@@ -977,7 +977,7 @@ export default function TravelInsightsPage() {
                           ? 'Travel Time'
                           : 'Estimated CO₂'
                       }
-                      stroke="#14b8a6"
+                      stroke="var(--accent-primary)"
                       strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#timeSeriesGradient)"
@@ -987,25 +987,25 @@ export default function TravelInsightsPage() {
               </div>
 
               {/* Chart Footer Note */}
-              <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] text-travel-muted pt-2 border-t border-travel flex flex-wrap items-center justify-between gap-2">
                 <span>
                   Showing {metrics.timeSeriesData.length} active travel days in current view
                 </span>
-                <span className="font-mono text-teal-300">
+                <span className="font-mono text-travel-accent">
                   Total: {metrics.totalDistanceDisplay} {distUnit} • {metrics.totalDurationFormatted}
                 </span>
               </div>
             </div>
 
             {/* Transport-Mode Breakdown (1 col) */}
-            <div className="bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
-              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div className="bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4 flex flex-col justify-between">
+              <div className="border-b border-travel pb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Compass className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-travel-accent" />
                     Transport-Mode Breakdown
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-travel-muted mt-0.5">
                     Modal split across walking, bus, car, bicycle, and rail.
                   </p>
                 </div>
@@ -1013,7 +1013,7 @@ export default function TravelInsightsPage() {
                 <select
                   value={modeBreakdownMetric}
                   onChange={(e) => setModeBreakdownMetric(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-teal-500 font-semibold"
+                  className="bg-travel-subtle border border-travel rounded-xl px-2.5 py-1 text-[11px] text-travel-secondary focus:outline-none focus:border-travel-accent font-semibold"
                 >
                   <option value="distance">By Distance</option>
                   <option value="trips">By Segments</option>
@@ -1051,8 +1051,8 @@ export default function TravelInsightsPage() {
 
                 {/* Donut Center Label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Modes</span>
-                  <span className="text-base font-black text-white font-mono">
+                  <span className="text-[10px] text-travel-muted uppercase font-bold">Modes</span>
+                  <span className="text-base font-black text-travel-primary font-mono">
                     {metrics.modeBreakdownList.length}
                   </span>
                 </div>
@@ -1063,15 +1063,15 @@ export default function TravelInsightsPage() {
                 {metrics.modeBreakdownList.map((mode) => (
                   <div key={mode.key} className="space-y-1 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span className="font-semibold text-travel-secondary flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: mode.color }} />
                         {mode.name}
                       </span>
-                      <span className="font-mono text-slate-400 text-[11px]">
+                      <span className="font-mono text-travel-muted text-[11px]">
                         {mode.distanceFormatted} ({mode.sharePercent}%)
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-travel-subtle rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${mode.sharePercent}%`, backgroundColor: mode.color }}
@@ -1086,25 +1086,25 @@ export default function TravelInsightsPage() {
           {/* 4. Row 2: Mode Comparison Over Equivalent Distance & Emission Factors Documentation */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Mode Comparison Over Equivalent Distances (2 cols) */}
-            <div className="lg:col-span-2 bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="lg:col-span-2 bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-travel pb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
                     <Leaf className="w-4 h-4 text-emerald-400" />
                     Emissions Comparison Over Equivalent Distances
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-travel-muted mt-0.5">
                     Estimated carbon impact if the exact same distance was traversed entirely by each modality.
                   </p>
                 </div>
 
                 {/* Distance Benchmark Selector */}
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 hidden sm:inline">Benchmark:</span>
+                  <span className="text-travel-muted hidden sm:inline">Benchmark:</span>
                   <select
                     value={equivalentBenchmarkKm}
                     onChange={(e) => setEquivalentBenchmarkKm(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1 text-xs text-teal-300 font-mono font-semibold focus:outline-none focus:border-teal-500"
+                    className="bg-travel-subtle border border-travel rounded-xl px-2.5 py-1 text-xs text-travel-accent font-mono font-semibold focus:outline-none focus:border-travel-accent"
                   >
                     <option value="traveled">Traveled Total ({metrics.totalDistanceDisplay} {distUnit})</option>
                     <option value="25">25 km (Short Trip)</option>
@@ -1122,17 +1122,17 @@ export default function TravelInsightsPage() {
                     data={metrics.equivalentComparisonData}
                     margin={{ top: 10, right: 15, left: -10, bottom: 25 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                     <XAxis
                       dataKey="mode"
-                      stroke="#64748b"
+                      stroke="var(--text-secondary)"
                       fontSize={10}
                       interval={0}
                       angle={-15}
                       textAnchor="end"
                       tickLine={false}
                     />
-                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                    <YAxis stroke="var(--text-secondary)" fontSize={11} tickLine={false} />
                     <Tooltip content={<SleekChartTooltip unit="kg CO₂" />} />
                     <Bar dataKey="co2Kg" name="Estimated Emissions" radius={[6, 6, 0, 0]}>
                       {metrics.equivalentComparisonData.map((entry, index) => (
@@ -1144,21 +1144,21 @@ export default function TravelInsightsPage() {
               </div>
 
               {/* Callout Summary */}
-              <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-travel-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-2.5">
                   <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-white block">Net Low-Carbon Transit Advantage</span>
-                    <span className="text-slate-300 text-[11px] leading-relaxed">
+                    <span className="font-bold text-travel-primary block">Net Low-Carbon Transit Advantage</span>
+                    <span className="text-travel-secondary text-[11px] leading-relaxed">
                       Traveling via electric rail and active walking over this distance generated{' '}
                       <strong className="text-emerald-400 font-mono">{metrics.totalEstimatedCo2Kg} kg CO₂</strong>, avoiding approximately{' '}
-                      <strong className="text-white font-mono">{metrics.netSavingsVsCar} kg CO₂</strong> compared to single-occupant private combustion cars.
+                      <strong className="text-travel-primary font-mono">{metrics.netSavingsVsCar} kg CO₂</strong> compared to single-occupant private combustion cars.
                     </span>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
-                  <span className="text-[10px] text-slate-400 block uppercase font-mono">Reduction vs Car</span>
+                  <span className="text-[10px] text-travel-muted block uppercase font-mono">Reduction vs Car</span>
                   <span className="text-base font-black text-emerald-400 font-mono">
                     {metrics.totalDistanceKm > 0
                       ? `~${Math.min(95, Math.round((metrics.netSavingsVsCar / Math.max(1, (metrics.totalDistanceKm * 0.17))) * 100))}%`
@@ -1169,11 +1169,11 @@ export default function TravelInsightsPage() {
             </div>
 
             {/* Documented Configurable Emission Factors (1 col) */}
-            <div className="bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
-              <div className="space-y-1 border-b border-slate-800 pb-3">
+            <div className="bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4 flex flex-col justify-between">
+              <div className="space-y-1 border-b border-travel pb-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-travel-accent" />
                     Documented Emission Factors
                   </h3>
                   <button
@@ -1182,12 +1182,12 @@ export default function TravelInsightsPage() {
                       setFactorFormState(emissionFactors);
                       setIsFactorModalOpen(true);
                     }}
-                    className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold"
+                    className="text-[11px] text-travel-accent hover:text-travel-accent font-semibold"
                   >
                     Edit
                   </button>
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-travel-muted">
                   Published factors per passenger-kilometer (g CO₂/km).
                 </p>
               </div>
@@ -1197,36 +1197,36 @@ export default function TravelInsightsPage() {
                 {Object.values(emissionFactors).map((factor) => (
                   <div
                     key={factor.key}
-                    className="p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/50 flex items-center justify-between"
+                    className="p-2.5 rounded-xl bg-travel-subtle/40 border border-travel/50 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: factor.color }} />
                       <div>
-                        <span className="font-semibold text-white block text-[11px]">{factor.label}</span>
-                        <span className="text-[10px] text-slate-500 font-mono">{factor.category}</span>
+                        <span className="font-semibold text-travel-primary block text-[11px]">{factor.label}</span>
+                        <span className="text-[10px] text-travel-muted font-mono">{factor.category}</span>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <span className="font-mono font-bold text-teal-300 text-xs block">
+                      <span className="font-mono font-bold text-travel-accent text-xs block">
                         {factor.gCo2PerKm} g
                       </span>
-                      <span className="text-[9px] text-slate-500 font-mono">per pass-km</span>
+                      <span className="text-[9px] text-travel-muted font-mono">per pass-km</span>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Methodological Transparency Note */}
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 space-y-1 leading-relaxed">
-                <div className="flex items-center gap-1.5 text-slate-300 font-bold text-xs">
-                  <HelpCircle className="w-3.5 h-3.5 text-teal-400" />
+              <div className="p-3 rounded-xl bg-travel-subtle border border-travel text-[11px] text-travel-muted space-y-1 leading-relaxed">
+                <div className="flex items-center gap-1.5 text-travel-secondary font-bold text-xs">
+                  <HelpCircle className="w-3.5 h-3.5 text-travel-accent" />
                   Calculation Methodology
                 </div>
                 <p>
-                  Formula: <code className="font-mono text-teal-300 text-[10px]">(Distance km × Factor g) ÷ 1,000 = kg CO₂</code>.
+                  Formula: <code className="font-mono text-travel-accent text-[10px]">(Distance km × Factor g) ÷ 1,000 = kg CO₂</code>.
                 </p>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-[10px] text-travel-muted">
                   Estimates are mathematical approximations from UK DEFRA & EEA passenger mobility benchmarks for demonstration. No physical sensors or custom AI model claimed.
                 </p>
               </div>
@@ -1236,13 +1236,13 @@ export default function TravelInsightsPage() {
           {/* 5. Row 3: Sustainability Suggestions & Journey Activity Table */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Sustainability Suggestions (1 col) */}
-            <div className="bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-              <div className="border-b border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-teal-400" />
+            <div className="bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4">
+              <div className="border-b border-travel pb-3">
+                <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-travel-accent" />
                   Data-Driven Sustainability Suggestions
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-travel-muted mt-0.5">
                   Contextual recommendations generated from your active trip chains.
                 </p>
               </div>
@@ -1251,17 +1251,17 @@ export default function TravelInsightsPage() {
                 {sustainabilitySuggestions.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2 hover:border-slate-600 transition"
+                    className="p-3.5 rounded-xl bg-travel-subtle/40 border border-travel/50 space-y-2 hover:border-slate-600 transition"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-travel-accent flex items-center gap-1.5">
                         {item.icon}
                         {item.badge}
                       </span>
                     </div>
 
-                    <h4 className="text-xs font-bold text-white">{item.title}</h4>
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                    <h4 className="text-xs font-bold text-travel-primary">{item.title}</h4>
+                    <p className="text-[11px] text-travel-secondary leading-relaxed">
                       {item.description}
                     </p>
                   </div>
@@ -1270,14 +1270,14 @@ export default function TravelInsightsPage() {
             </div>
 
             {/* Travel Activity Breakdown Table (2 cols) */}
-            <div className="lg:col-span-2 bg-[#0f172a] p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="lg:col-span-2 bg-travel-card p-5 rounded-2xl border border-travel shadow-xl space-y-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between border-b border-travel pb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <FileSpreadsheet className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-bold text-travel-primary flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-travel-accent" />
                     Journey Activity Breakdown
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-travel-muted mt-0.5">
                     Trip chains contributing to telemetry within {dateRangeDescription}.
                   </p>
                 </div>
@@ -1285,7 +1285,7 @@ export default function TravelInsightsPage() {
                 <button
                   type="button"
                   onClick={() => setActivePage('journeys')}
-                  className="text-xs font-semibold text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                  className="text-xs font-semibold text-travel-accent hover:text-travel-accent flex items-center gap-1"
                 >
                   <span>View All Journeys</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -1296,7 +1296,7 @@ export default function TravelInsightsPage() {
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-mono">
+                    <tr className="border-b border-travel text-[10px] text-travel-muted uppercase font-mono">
                       <th className="pb-2.5">Journey & Route</th>
                       <th className="pb-2.5">Date</th>
                       <th className="pb-2.5">Mode</th>
@@ -1306,7 +1306,7 @@ export default function TravelInsightsPage() {
                       <th className="pb-2.5 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-travel/60">
                     {filteredJourneys.map((j) => {
                       const dVal = isMi
                         ? (parseFloat(j.totalDistanceKm || 0) * distMultiplier).toFixed(1)
@@ -1315,31 +1315,31 @@ export default function TravelInsightsPage() {
                       const durFormatted = `${Math.floor(durMins / 60)}h ${durMins % 60}m`;
 
                       return (
-                        <tr key={j.id} className="hover:bg-slate-800/30 transition group">
+                        <tr key={j.id} className="hover:bg-travel-subtle/30 transition group">
                           <td className="py-3 pr-2">
-                            <div className="font-bold text-white group-hover:text-teal-300 transition truncate max-w-xs">
+                            <div className="font-bold text-travel-primary group-hover:text-travel-accent transition truncate max-w-xs">
                               {j.title}
                             </div>
-                            <div className="text-[11px] text-slate-400 truncate max-w-xs">
+                            <div className="text-[11px] text-travel-muted truncate max-w-xs">
                               {j.origin} → {j.destination}
                             </div>
                           </td>
 
-                          <td className="py-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                          <td className="py-3 font-mono text-[11px] text-travel-secondary whitespace-nowrap">
                             {j.travelDate || j.startDate || 'N/A'}
                           </td>
 
                           <td className="py-3">
-                            <span className="text-[10px] bg-slate-800 text-teal-300 px-2 py-0.5 rounded font-medium border border-slate-700 whitespace-nowrap">
+                            <span className="text-[10px] bg-travel-subtle text-travel-accent px-2 py-0.5 rounded font-medium border border-travel whitespace-nowrap">
                               {j.primaryTransportMode}
                             </span>
                           </td>
 
-                          <td className="py-3 text-right font-mono font-bold text-white whitespace-nowrap">
+                          <td className="py-3 text-right font-mono font-bold text-travel-primary whitespace-nowrap">
                             {dVal} {distUnit}
                           </td>
 
-                          <td className="py-3 text-right font-mono text-slate-300 whitespace-nowrap">
+                          <td className="py-3 text-right font-mono text-travel-secondary whitespace-nowrap">
                             {durFormatted}
                           </td>
 
@@ -1351,7 +1351,7 @@ export default function TravelInsightsPage() {
                             <button
                               type="button"
                               onClick={() => navigateToJourney(j.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                              className="p-1.5 rounded-lg text-travel-muted hover:text-travel-primary hover:bg-travel-subtle transition"
                               title="Open Trip Chain Details"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -1365,9 +1365,9 @@ export default function TravelInsightsPage() {
               </div>
 
               {/* Table Footer */}
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="pt-2 border-t border-travel flex items-center justify-between text-[11px] text-travel-muted">
                 <span>{filteredJourneys.length} trip chains included</span>
-                <span className="font-mono text-teal-300 font-semibold">
+                <span className="font-mono text-travel-accent font-semibold">
                   Aggregated: {metrics.totalDistanceDisplay} {distUnit} • {metrics.totalEstimatedCo2Kg} kg CO₂
                 </span>
               </div>
@@ -1387,7 +1387,7 @@ export default function TravelInsightsPage() {
           <div className="space-y-4 text-xs">
             {/* Presets Bar */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-bold text-travel-muted uppercase tracking-wider mb-1.5">
                 Quick Modeling Presets
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1409,20 +1409,20 @@ export default function TravelInsightsPage() {
                     }}
                     className={`p-2.5 rounded-xl border text-left transition ${
                       activeFactorPreset === p.id
-                        ? 'bg-teal-950/40 border-teal-500/50 ring-1 ring-teal-500/30'
-                        : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800'
+                        ? 'bg-travel-subtle/40 border-travel-accent/50 ring-1 ring-1 ring-travel-accent'
+                        : 'bg-travel-subtle/40 border-travel/60 hover:bg-travel-subtle'
                     }`}
                   >
-                    <div className="font-bold text-white text-[11px]">{p.name}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{p.description}</div>
+                    <div className="font-bold text-travel-primary text-[11px]">{p.name}</div>
+                    <div className="text-[10px] text-travel-muted mt-0.5 line-clamp-2">{p.description}</div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Custom Inputs */}
-            <div className="space-y-2 pt-2 border-t border-slate-800">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <div className="space-y-2 pt-2 border-t border-travel">
+              <label className="block text-[11px] font-bold text-travel-muted uppercase tracking-wider mb-1">
                 Modal Factors (g CO₂ / passenger-km)
               </label>
 
@@ -1430,11 +1430,11 @@ export default function TravelInsightsPage() {
                 {Object.values(factorFormState).map((item) => (
                   <div
                     key={item.key}
-                    className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5"
+                    className="p-2.5 rounded-xl bg-travel-subtle border border-travel space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-xs">{item.label}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">g/km</span>
+                      <span className="font-bold text-travel-primary text-xs">{item.label}</span>
+                      <span className="text-[10px] text-travel-muted font-mono">g/km</span>
                     </div>
 
                     <input
@@ -1452,10 +1452,10 @@ export default function TravelInsightsPage() {
                           },
                         }));
                       }}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                      className="w-full bg-travel-subtle border border-travel rounded-lg px-2.5 py-1 text-xs text-travel-primary font-mono focus:outline-none focus:border-travel-accent"
                     />
 
-                    <div className="text-[9px] text-slate-500 truncate" title={item.source}>
+                    <div className="text-[9px] text-travel-muted truncate" title={item.source}>
                       Ref: {item.source}
                     </div>
                   </div>
@@ -1464,11 +1464,11 @@ export default function TravelInsightsPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+            <div className="pt-3 border-t border-travel flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={resetFactorsToDefault}
-                className="px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-white flex items-center gap-1"
+                className="px-3 py-2 rounded-xl text-xs text-travel-muted hover:text-travel-primary flex items-center gap-1"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset Defaults
@@ -1478,14 +1478,14 @@ export default function TravelInsightsPage() {
                 <button
                   type="button"
                   onClick={() => setIsFactorModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs text-travel-muted hover:text-travel-primary"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => saveCustomFactors(factorFormState)}
-                  className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition"
+                  className="px-5 py-2 rounded-xl btn-travel-primary font-bold text-xs transition"
                 >
                   Apply Factors
                 </button>

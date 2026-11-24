@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import api, { getToken, setToken, removeToken } from '../services/api';
 import {
@@ -10,6 +10,7 @@ import {
   INITIAL_RECENT_JOURNEYS,
   INITIAL_TRUSTED_CONTACTS,
   INITIAL_GEOFENCE_LOGS,
+  INITIAL_DANGER_ZONES,
 } from '../data/mockData';
 
 const AppContext = createContext(null);
@@ -26,6 +27,7 @@ const STORAGE_KEYS = {
   TRUSTED_CONTACTS: 'tripmate_demo_trusted_contacts',
   EMERGENCY_SESSION: 'tripmate_demo_emergency_session',
   GEOFENCE_LOGS: 'tripmate_demo_geofence_logs',
+  DANGER_ZONES: 'tripmate_demo_danger_zones',
 };
 
 export function AppProvider({ children }) {
@@ -84,7 +86,9 @@ export function AppProvider({ children }) {
 
   // User Profile
   const [user, setUser] = useState(() => {
-    return getToken() ? { name: 'Traveler', email: '', homeCity: '' } : INITIAL_USER;
+    return getToken()
+      ? { name: 'Traveler', email: '', homeCity: 'Vidisha, Madhya Pradesh', homeCountry: 'India' }
+      : INITIAL_USER;
   });
 
   // Settings
@@ -98,6 +102,56 @@ export function AppProvider({ children }) {
       return INITIAL_SETTINGS;
     }
   });
+
+  // Synchronize document root theme family & appearance
+  useEffect(() => {
+    const family = settings?.themeFamily || 'forest';
+    const appearanceSetting = settings?.appearance || (settings?.theme === 'light' ? 'light' : 'dark');
+
+    const resolveAppearance = () => {
+      if (appearanceSetting === 'system') {
+        if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          return 'dark';
+        }
+        return 'light';
+      }
+      return appearanceSetting === 'light' ? 'light' : 'dark';
+    };
+
+    const effectiveAppearance = resolveAppearance();
+
+    // Apply attributes to document root
+    document.documentElement.setAttribute('data-theme-family', family);
+    document.documentElement.setAttribute('data-appearance', effectiveAppearance);
+    document.documentElement.setAttribute('data-theme', effectiveAppearance);
+
+    if (effectiveAppearance === 'dark') {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+
+    // Listen for system changes if system appearance is chosen
+    if (appearanceSetting === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e) => {
+        const sysMode = e.matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-appearance', sysMode);
+        document.documentElement.setAttribute('data-theme', sysMode);
+        if (sysMode === 'dark') {
+          document.documentElement.classList.remove('light');
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+        }
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [settings?.themeFamily, settings?.appearance, settings?.theme]);
 
   // Journeys
   const [journeys, setJourneys] = useState(() => {
@@ -304,17 +358,36 @@ export function AppProvider({ children }) {
     }
   });
 
-  // Geofence Event History Logs
+  // Geofence Event History Logs (isolated per user account, starts clean)
   const [geofenceEventLogs, setGeofenceEventLogs] = useState(() => {
+    if (getToken()) return [];
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.GEOFENCE_LOGS);
-      if (!saved) return INITIAL_GEOFENCE_LOGS;
+      if (!saved) return [];
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_GEOFENCE_LOGS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return INITIAL_GEOFENCE_LOGS;
+      return [];
     }
   });
+
+  // Monitored Danger Zones (hazard perimeters for real-world geofencing)
+  const [dangerZones, setDangerZones] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DANGER_ZONES);
+      if (!saved) return INITIAL_DANGER_ZONES;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : INITIAL_DANGER_ZONES;
+    } catch {
+      return INITIAL_DANGER_ZONES;
+    }
+  });
+
+  // Active Danger Zone Breach State
+  const [activeDangerBreach, setActiveDangerBreach] = useState(null);
+  const insideDangerZonesRef = useRef(new Set());
+  const suppressedDangerZonesRef = useRef(new Map());
+  const lastToastRecordRef = useRef({ key: '', time: 0 });
 
   // Accidental Activation Confirmation Modal State
   const [isSosConfirmOpen, setIsSosConfirmOpen] = useState(false);
@@ -419,6 +492,70 @@ export function AppProvider({ children }) {
     }
   }, [geofenceEventLogs]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.DANGER_ZONES, JSON.stringify(dangerZones));
+    } catch (e) {
+      console.warn('LocalStorage save failed', e);
+    }
+  }, [dangerZones]);
+
+  // 60-second Safety Countdown Timer for Danger Zone Breaches
+  useEffect(() => {
+    let interval = null;
+    if (activeDangerBreach && activeDangerBreach.status === 'warning') {
+      interval = setInterval(() => {
+        setActiveDangerBreach((prev) => {
+          if (!prev || prev.status !== 'warning') return prev;
+          if (prev.remainingSeconds <= 1) {
+            // Timer expired without user clicking "I'm Safe" -> Auto Escalation
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const escalationLog = {
+              id: 'geo-' + Date.now(),
+              placeId: prev.zone.id,
+              placeName: prev.zone.name,
+              category: 'Danger Zone',
+              hazardType: prev.zone.hazardType || 'Hazard Zone',
+              eventType: 'ESCALATION_TRIGGERED',
+              timestamp: `Today, ${timeStr}`,
+              radiusMeters: prev.zone.radiusMeters || 300,
+              coords: prev.zone.coords,
+              note: `AUTOMATIC ESCALATION: 60s safety timer expired without confirmation in hazard zone "${prev.zone.name}" (${prev.zone.hazardType || 'Hazard'}). Trusted emergency contacts alerted (Simulated client relay).`,
+              isSimulated: true,
+            };
+            setGeofenceEventLogs((l) => [escalationLog, ...l]);
+
+            // Single clear alert
+            const toastId = 't-' + Date.now();
+            setToasts([{
+              id: toastId,
+              title: 'EMERGENCY ESCALATION DISPATCHED (SIMULATED)',
+              message: `60s expired in danger zone "${prev.zone.name}". Simulated distress telemetry dispatched to trusted contacts.`,
+              type: 'error',
+            }]);
+            setTimeout(() => {
+              setToasts((t) => t.filter((x) => x.id !== toastId));
+            }, 3000);
+
+            return {
+              ...prev,
+              remainingSeconds: 0,
+              status: 'escalated',
+            };
+          }
+          return {
+            ...prev,
+            remainingSeconds: prev.remainingSeconds - 1,
+          };
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeDangerBreach?.status]);
+
   // Live ticking timer for SIMULATED EMERGENCY SESSION
   useEffect(() => {
     let interval = null;
@@ -449,13 +586,23 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Toast handler
+  // Toast handler with deduplication and sensible single-item cap (3s auto-dismiss)
   const addToast = (title, message, type = 'info') => {
-    const id = Date.now() + Math.random().toString(36).substring(2, 6);
-    setToasts((prev) => [...prev, { id, title, message, type }]);
+    const now = Date.now();
+    const key = `${title}__${message}`;
+    // Deduplicate identical notifications emitted within 3000ms
+    if (lastToastRecordRef.current.key === key && now - lastToastRecordRef.current.time < 3000) {
+      return;
+    }
+    lastToastRecordRef.current = { key, time: now };
+
+    const id = 't-' + now + '-' + Math.random().toString(36).substring(2, 6);
+    // Sensible cap: maximum 1 active toast at a time
+    setToasts([{ id, title, message, type }]);
+
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    }, 3000);
   };
 
   const removeToast = (id) => {
@@ -592,9 +739,11 @@ export function AppProvider({ children }) {
         setUser(res.user);
         setIsAuthenticated(true);
         setIsDemoMode(false);
-        // Reset local safety logs to isolate user account
+        // Reset local safety and geofence logs to isolate user account
         setCheckInLogs([]);
         setSosLogs([]);
+        setGeofenceEventLogs([]);
+        setActiveDangerBreach(null);
         setEmergencySession(DEFAULT_EMERGENCY_SESSION);
         await fetchCloudData();
         setActivePage('overview');
@@ -614,9 +763,11 @@ export function AppProvider({ children }) {
         setUser(res.user);
         setIsAuthenticated(true);
         setIsDemoMode(false);
-        // Reset local safety logs to isolate user account
+        // Reset local safety and geofence logs to isolate user account
         setCheckInLogs([]);
         setSosLogs([]);
+        setGeofenceEventLogs([]);
+        setActiveDangerBreach(null);
         setEmergencySession(DEFAULT_EMERGENCY_SESSION);
         await fetchCloudData();
         setActivePage('overview');
@@ -631,7 +782,7 @@ export function AppProvider({ children }) {
     api.auth.logout();
     setIsAuthenticated(false);
     setIsDemoMode(false);
-    setUser({ name: 'Traveler', email: '', homeCity: '' });
+    setUser({ name: 'Traveler', email: '', homeCity: 'Vidisha, Madhya Pradesh', homeCountry: 'India' });
     setJourneys([]);
     setSavedPlaces([]);
     setTrustedContacts([]);
@@ -639,6 +790,8 @@ export function AppProvider({ children }) {
     setRecentJourneys([]);
     setCheckInLogs([]);
     setSosLogs([]);
+    setGeofenceEventLogs([]);
+    setActiveDangerBreach(null);
     setEmergencySession(DEFAULT_EMERGENCY_SESSION);
     setJourneyLiveState({ status: 'idle', activeSegmentIndex: 0, journeyId: null });
     setActiveJourneyId('');
@@ -648,6 +801,7 @@ export function AppProvider({ children }) {
       localStorage.removeItem(STORAGE_KEYS.SOS_LOGS);
       localStorage.removeItem(STORAGE_KEYS.EMERGENCY_SESSION);
       localStorage.removeItem(STORAGE_KEYS.LIVE_STATE);
+      localStorage.removeItem(STORAGE_KEYS.GEOFENCE_LOGS);
     } catch {}
     addToast('Signed Out', 'You have been signed out of your cloud account.', 'info');
   };
@@ -778,26 +932,248 @@ export function AppProvider({ children }) {
   const addExpenseToJourney = async (journeyId, expenseData) => {
     const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
     if (!journey) return;
+    const amountVal = parseFloat(expenseData.amount) || 0;
     const newExpense = {
       id: 'exp-' + Date.now(),
-      title: expenseData.title,
-      amount: parseFloat(expenseData.amount) || 0,
-      category: expenseData.category || 'Dining',
+      title: expenseData.title || 'Trip Expense',
+      amount: amountVal,
+      originalAmount: amountVal,
+      currency: expenseData.currency || journey.currency || settings.currency || 'USD',
+      originalCurrency: expenseData.currency || journey.currency || settings.currency || 'USD',
+      category: expenseData.category || 'Other',
       date: expenseData.date || new Date().toISOString().split('T')[0],
+      linkedType: expenseData.linkedType || 'none',
+      linkedId: expenseData.linkedId || null,
+      notes: expenseData.notes || '',
+      receiptUrl: expenseData.receiptUrl || '',
     };
     const updatedExpenses = [newExpense, ...(journey.expenses || [])];
-    const updatedSpent = (journey.spent || 0) + newExpense.amount;
+    const updatedSpent = parseFloat(((journey.spent || 0) + amountVal).toFixed(2));
 
     setJourneys((prev) =>
       prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, expenses: updatedExpenses, spent: updatedSpent } : j))
     );
-    addToast('Expense Recorded', `$${newExpense.amount} added under ${newExpense.category}.`, 'success');
+    addToast('Expense Recorded', `${newExpense.currency} ${newExpense.amount} added under ${newExpense.category}.`, 'success');
 
     if (isAuthenticated && isBackendConnected) {
       try {
         await api.journeys.update(journeyId, { expenses: updatedExpenses, spent: updatedSpent });
       } catch (e) {
         console.warn('Backend expense add failed', e.message);
+      }
+    }
+  };
+
+  const deleteExpenseFromJourney = async (journeyId, expenseId) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const target = (journey.expenses || []).find((e) => e.id === expenseId || e._id === expenseId);
+    const updatedExpenses = (journey.expenses || []).filter((e) => e.id !== expenseId && e._id !== expenseId);
+    const updatedSpent = Math.max(0, parseFloat(((journey.spent || 0) - (target?.amount || 0)).toFixed(2)));
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, expenses: updatedExpenses, spent: updatedSpent } : j))
+    );
+    addToast('Expense Removed', 'Expense record was removed.', 'info');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { expenses: updatedExpenses, spent: updatedSpent });
+      } catch (e) {
+        console.warn('Backend expense delete failed', e.message);
+      }
+    }
+  };
+
+  // Accommodation / Stays handlers
+  const addStayToJourney = async (journeyId, stayData) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const newStay = {
+      id: 'stay-' + Date.now(),
+      name: stayData.name || 'Lodging Stay',
+      propertyType: stayData.propertyType || 'hotel',
+      address: stayData.address || '',
+      coords: stayData.coords || undefined,
+      checkInDate: stayData.checkInDate || journey.startDate || '',
+      checkInTime: stayData.checkInTime || '14:00',
+      checkOutDate: stayData.checkOutDate || journey.endDate || '',
+      checkOutTime: stayData.checkOutTime || '11:00',
+      nights: parseInt(stayData.nights, 10) || 1,
+      totalPrice: parseFloat(stayData.totalPrice) || 0,
+      currency: stayData.currency || journey.currency || settings.currency || 'USD',
+      bookingStatus: stayData.bookingStatus || 'planned',
+      bookingUrl: stayData.bookingUrl || '',
+      confirmationNumber: stayData.confirmationNumber || '',
+      phone: stayData.phone || '',
+      notes: stayData.notes || '',
+      source: stayData.source || 'manual',
+    };
+    const updatedStays = [...(journey.stays || []), newStay];
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, stays: updatedStays } : j))
+    );
+    addToast('Stay Added', `Added ${newStay.name} to accommodations.`, 'success');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { stays: updatedStays });
+      } catch (e) {
+        console.warn('Backend stay add failed', e.message);
+      }
+    }
+  };
+
+  const deleteStayFromJourney = async (journeyId, stayId) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const updatedStays = (journey.stays || []).filter((s) => s.id !== stayId && s._id !== stayId);
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, stays: updatedStays } : j))
+    );
+    addToast('Stay Removed', 'Accommodation record removed.', 'info');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { stays: updatedStays });
+      } catch (e) {
+        console.warn('Backend stay delete failed', e.message);
+      }
+    }
+  };
+
+  // Places & Activities handlers
+  const addPlaceToJourney = async (journeyId, placeData) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const newPlace = {
+      id: 'place-' + Date.now(),
+      title: placeData.title,
+      category: placeData.category || 'attraction',
+      address: placeData.address || '',
+      coords: placeData.coords || undefined,
+      day: parseInt(placeData.day, 10) || 1,
+      visitDate: placeData.visitDate || journey.startDate || '',
+      visitTime: placeData.visitTime || '',
+      notes: placeData.notes || '',
+      visited: false,
+      source: placeData.source || 'manual',
+    };
+    const updatedPlaces = [...(journey.places || []), newPlace];
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, places: updatedPlaces } : j))
+    );
+    addToast('Place Added', `Added "${newPlace.title}" to itinerary places.`, 'success');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { places: updatedPlaces });
+      } catch (e) {
+        console.warn('Backend place add failed', e.message);
+      }
+    }
+  };
+
+  const togglePlaceVisited = async (journeyId, placeId) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const updatedPlaces = (journey.places || []).map((p) => {
+      if (p.id === placeId || p._id === placeId) {
+        return { ...p, visited: !p.visited };
+      }
+      return p;
+    });
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, places: updatedPlaces } : j))
+    );
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { places: updatedPlaces });
+      } catch (e) {
+        console.warn('Backend place toggle failed', e.message);
+      }
+    }
+  };
+
+  const deletePlaceFromJourney = async (journeyId, placeId) => {
+    const journey = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!journey) return;
+    const updatedPlaces = (journey.places || []).filter((p) => p.id !== placeId && p._id !== placeId);
+
+    setJourneys((prev) =>
+      prev.map((j) => (j.id === journeyId || j._id === journeyId ? { ...j, places: updatedPlaces } : j))
+    );
+    addToast('Place Removed', 'Place removed from itinerary.', 'info');
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.journeys.update(journeyId, { places: updatedPlaces });
+      } catch (e) {
+        console.warn('Backend place delete failed', e.message);
+      }
+    }
+  };
+
+  // Duplicate Journey
+  const duplicateJourney = async (journeyId) => {
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        const res = await api.journeys.duplicate(journeyId);
+        if (res.journey) {
+          const cloudJ = { ...res.journey, id: res.journey.id || res.journey._id };
+          setJourneys((prev) => [cloudJ, ...prev]);
+          setActiveJourneyId(cloudJ.id);
+          addToast('Trip Duplicated', `"${cloudJ.title}" ready to plan.`, 'success');
+          return cloudJ;
+        }
+      } catch (err) {
+        console.error('Backend duplicate failed:', err);
+        addToast('Duplicate Failed', err.message || 'Could not duplicate trip.', 'error');
+      }
+    }
+
+    const original = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (!original) return;
+    const duplicated = {
+      ...JSON.parse(JSON.stringify(original)),
+      id: `trip-${Date.now()}`,
+      title: `${original.title} (Copy)`,
+      status: 'Draft',
+      createdAt: new Date().toISOString(),
+    };
+
+    setJourneys((prev) => [duplicated, ...prev]);
+    setActiveJourneyId(duplicated.id);
+    addToast('Trip Duplicated', `"${duplicated.title}" ready to plan.`, 'success');
+    return duplicated;
+  };
+
+  // Update User Preferences
+  const updateUserSettings = async (newSettings, { silent = false } = {}) => {
+    const merged = { ...settings, ...newSettings };
+    setSettings(merged);
+    setUser((prev) => ({ ...prev, settings: merged }));
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
+    } catch {}
+
+    if (isAuthenticated && isBackendConnected) {
+      try {
+        await api.auth.updateProfile({ settings: merged });
+        if (!silent) {
+          addToast('Preferences Synced', 'Updated regional formatting and travel settings.', 'success');
+        }
+      } catch (err) {
+        console.warn('Backend settings update failed:', err);
+      }
+    } else {
+      if (!silent) {
+        addToast('Preferences Saved', 'Updated local display settings.', 'info');
       }
     }
   };
@@ -839,90 +1215,56 @@ export function AppProvider({ children }) {
       }
     }
 
-    const newId = (journeyData.destination || 'journey').toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
     const origin = journeyData.origin || 'City Departure Point';
     const destination = journeyData.destination || 'Destination Point';
-    const travelDate = journeyData.travelDate || journeyData.startDate || new Date().toISOString().split('T')[0];
-    const mode = journeyData.primaryTransportMode || 'Walking + Transit';
+    const finalTitle = journeyData.title && journeyData.title.trim() ? journeyData.title.trim() : `${origin} ➔ ${destination}`;
+    const newId = (journeyData.destination || 'trip').toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+    const startDate = journeyData.startDate || journeyData.travelDate || '';
+    const endDate = journeyData.endDate || '';
+    const isUndated = Boolean(journeyData.isUndated || (!startDate && !endDate));
+    const mode = journeyData.primaryTransportMode || 'Multi-Modal';
     const status = journeyData.status || 'Upcoming';
 
-    // Build initial starter segment if user didn't provide custom segments
-    const initialSegments = journeyData.initialSegments || [
-      {
-        id: 'seg-init-1',
-        order: 1,
-        type: (mode.toLowerCase().includes('bus') ? 'bus' : mode.toLowerCase().includes('train') ? 'train' : 'walking'),
-        modeType: (mode.toLowerCase().includes('bus') ? 'bus' : mode.toLowerCase().includes('train') ? 'train' : 'walking'),
-        mode: mode,
-        transportMode: mode,
-        title: `Primary Transit Leg: ${origin} to ${destination}`,
-        from: origin,
-        origin: origin,
-        to: destination,
-        destination: destination,
-        distanceKm: parseFloat(journeyData.totalDistanceKm) || 4.5,
-        distanceMi: parseFloat(((parseFloat(journeyData.totalDistanceKm) || 4.5) * 0.621371).toFixed(1)),
-        durationMinutes: parseInt(journeyData.totalDurationMinutes, 10) || 30,
-        duration: `${parseInt(journeyData.totalDurationMinutes, 10) || 30}m`,
-        startTime: '09:00 AM',
-        endTime: '09:30 AM',
-        transitLine: journeyData.transitLine || null,
-        co2SavedKg: 0.8,
-        isStop: false,
-        notes: journeyData.summary || 'Initial registered segment for this trip chain.',
-        status: status === 'Active' || status === 'In Progress' ? 'In Progress' : 'Scheduled',
-        telemetry: 'Demo Simulated Segment • Initial Leg',
-      },
-    ];
+    // Start with explicitly passed segments, or clean empty array for new trips
+    const initialSegments = Array.isArray(journeyData.segments || journeyData.initialSegments)
+      ? (journeyData.segments || journeyData.initialSegments)
+      : [];
 
     const totals = calculateJourneyTotals(initialSegments);
 
     const newJourney = {
       id: newId,
-      title: journeyData.title || `Expedition: ${origin} to ${destination}`,
+      title: finalTitle,
       origin: origin,
       destination: destination,
-      travelDate: travelDate,
-      startDate: travelDate,
-      endDate: journeyData.endDate || travelDate,
+      travelDate: startDate || '',
+      startDate: startDate || '',
+      endDate: endDate || '',
+      isUndated: isUndated,
       currentDay: 1,
       totalDays: 1,
       status: status,
       countryCode: journeyData.countryCode || 'INT',
+      currency: journeyData.currency || settings.currency || 'USD',
       primaryTransportMode: mode,
-      transitTypes: [mode.toLowerCase()],
+      transitTypes: ['multi-modal'],
       totalDistanceKm: totals.totalDistanceKm,
       totalDurationMinutes: totals.totalDurationMinutes,
       estimatedCo2Kg: totals.estimatedCo2Kg,
-      isDemoData: true,
-      demoNotice: "Demo Trip Chain: Segments and timings are simulated demonstration records. No actual device GPS or hardware step sensor collection.",
+      isDemoData: false,
       coverImage: journeyData.coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
-      summary: journeyData.summary || `Structured trip chain from ${origin} to ${destination}.`,
-      budget: parseFloat(journeyData.budget) || 120,
+      summary: journeyData.summary || '',
+      notes: journeyData.notes || '',
+      budget: parseFloat(journeyData.budget) || 0,
       spent: 0,
-      center: journeyData.center || [35.0116, 135.7681],
-      zoom: 13,
-      currentLocation: {
-        name: `${origin} (Simulated Demo)`,
-        coords: journeyData.center || [35.0116, 135.7681],
-        updatedAgo: 'Ready',
-        safeZone: true,
-      },
-      localEmergencyNumbers: {
-        police: '112 / 911',
-        ambulance: '112 / 911',
-      },
-      hotelInfo: {
-        name: journeyData.hotelName || 'Base Lodging pending',
-        address: destination,
-        phone: 'N/A',
-      },
-      waypoints: [
-        { id: `wp-${Date.now()}-1`, title: origin, coords: [35.0116, 135.7681], completed: false, isOrigin: true },
-        { id: `wp-${Date.now()}-2`, title: destination, coords: [35.0216, 135.7781], completed: false, isDestination: true },
-      ],
+      center: journeyData.center || [20, 0],
+      zoom: 12,
+      waypoints: Array.isArray(journeyData.waypoints) ? journeyData.waypoints : [],
+      routeGeometry: Array.isArray(journeyData.routeGeometry) ? journeyData.routeGeometry : [],
       segments: initialSegments,
       travelSegments: initialSegments,
+      stays: Array.isArray(journeyData.stays) ? journeyData.stays : [],
+      places: Array.isArray(journeyData.places) ? journeyData.places : [],
       itineraryDays: [],
       packingList: [],
       expenses: [],
@@ -2007,7 +2349,247 @@ export function AppProvider({ children }) {
     addToast('Data Exported', 'Your journeys and safety data were downloaded as JSON.', 'success');
   };
 
+  const setThemeFamily = (family) => {
+    updateUserSettings({ themeFamily: family }, { silent: true });
+  };
+
+  const setAppearance = (mode) => {
+    updateUserSettings({
+      appearance: mode,
+      theme: mode === 'light' ? 'light' : 'dark',
+    }, { silent: true });
+  };
+
+  const toggleTheme = () => {
+    const currentAppearance = settings?.appearance || (settings?.theme === 'light' ? 'light' : 'dark');
+    const nextAppearance = currentAppearance === 'light' ? 'dark' : 'light';
+    updateUserSettings({
+      appearance: nextAppearance,
+      theme: nextAppearance,
+    }, { silent: true });
+  };
+
+  // Helper Haversine distance in meters
+  const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // metres
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
+
+  // Evaluate Danger Zones against GPS position
+  const evaluateDangerZones = useCallback((userCoords, accuracy = 20) => {
+    if (!userCoords || userCoords.length !== 2 || isNaN(userCoords[0]) || isNaN(userCoords[1])) return;
+    const [uLat, uLng] = userCoords;
+    const now = Date.now();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    dangerZones.forEach((zone) => {
+      if (!zone.isActive) return;
+      const zoneCoords = zone.coords || [zone.lat, zone.lng];
+      if (!zoneCoords || zoneCoords.length !== 2 || isNaN(zoneCoords[0]) || isNaN(zoneCoords[1])) return;
+
+      const dist = calculateDistanceMeters(uLat, uLng, zoneCoords[0], zoneCoords[1]);
+      const effectiveRadius = (zone.radiusMeters || 300) + Math.min(accuracy || 20, 25);
+      const isInside = dist <= effectiveRadius;
+      const wasInside = insideDangerZonesRef.current.has(zone.id);
+
+      const suppressUntil = suppressedDangerZonesRef.current.get(zone.id) || 0;
+      const isSuppressed = now < suppressUntil;
+
+      if (isInside && !wasInside) {
+        insideDangerZonesRef.current.add(zone.id);
+
+        if (!isSuppressed) {
+          const entryLog = {
+            id: 'geo-' + Date.now(),
+            placeId: zone.id,
+            placeName: zone.name,
+            category: 'Danger Zone',
+            hazardType: zone.hazardType || 'Hazard Zone',
+            eventType: 'DANGER_ENTRY',
+            timestamp: `Today, ${timeStr}`,
+            radiusMeters: zone.radiusMeters || 300,
+            coords: userCoords,
+            note: `WARNING: Entered hazard zone "${zone.name}" (${zone.hazardType || 'Hazard'}, ${zone.radiusMeters || 300}m radius). 60s safety countdown initiated.`,
+            isSimulated: true,
+          };
+          setGeofenceEventLogs((prev) => [entryLog, ...prev]);
+
+          setActiveDangerBreach({
+            zone: zone,
+            enteredAt: timeStr,
+            remainingSeconds: 60,
+            status: 'warning',
+          });
+
+          addToast(
+            '⚠️ DANGER ZONE DETECTED',
+            `Entered ${zone.name} (${zone.hazardType || 'Hazard'}). 60s safety countdown active.`,
+            'warning'
+          );
+        }
+      } else if (!isInside && wasInside) {
+        insideDangerZonesRef.current.delete(zone.id);
+
+        const exitLog = {
+          id: 'geo-' + Date.now(),
+          placeId: zone.id,
+          placeName: zone.name,
+          category: 'Danger Zone',
+          hazardType: zone.hazardType || 'Hazard Zone',
+          eventType: 'DANGER_EXIT',
+          timestamp: `Today, ${timeStr}`,
+          radiusMeters: zone.radiusMeters || 300,
+          coords: userCoords,
+          note: `Departed hazard zone "${zone.name}". Safety countdown aborted.`,
+          isSimulated: true,
+        };
+        setGeofenceEventLogs((prev) => [exitLog, ...prev]);
+
+        setActiveDangerBreach((prev) => (prev && prev.zone.id === zone.id ? null : prev));
+        addToast(
+          'Departed Danger Zone',
+          `You have moved outside the boundary of ${zone.name}.`,
+          'info'
+        );
+      }
+    });
+  }, [dangerZones]);
+
+  // Action: User confirms "I'm Safe"
+  const confirmDangerZoneSafe = () => {
+    if (!activeDangerBreach) return;
+    const zone = activeDangerBreach.zone;
+    const now = Date.now();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Suppress for 15 minutes
+    suppressedDangerZonesRef.current.set(zone.id, now + 15 * 60 * 1000);
+
+    const safeLog = {
+      id: 'geo-' + Date.now(),
+      placeId: zone.id,
+      placeName: zone.name,
+      category: 'Danger Zone',
+      hazardType: zone.hazardType || 'Hazard Zone',
+      eventType: 'SAFETY_CONFIRMED',
+      timestamp: `Today, ${timeStr}`,
+      radiusMeters: zone.radiusMeters || 300,
+      coords: zone.coords,
+      note: `User confirmed safety in hazard zone "${zone.name}". Escalation suppressed for 15 minutes.`,
+      isSimulated: true,
+    };
+    setGeofenceEventLogs((prev) => [safeLog, ...prev]);
+
+    setActiveDangerBreach(null);
+    addToast(
+      'Safety Confirmed',
+      `You marked yourself safe in ${zone.name}. Alerts paused for 15 minutes.`,
+      'success'
+    );
+  };
+
+  const dismissDangerBreach = () => {
+    setActiveDangerBreach(null);
+  };
+
+  const simulateDangerZoneEntry = (zoneId) => {
+    const target = dangerZones.find((z) => z.id === zoneId) || dangerZones[0];
+    if (!target) return;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    insideDangerZonesRef.current.add(target.id);
+    suppressedDangerZonesRef.current.delete(target.id);
+
+    const entryLog = {
+      id: 'geo-' + Date.now(),
+      placeId: target.id,
+      placeName: target.name,
+      category: 'Danger Zone',
+      hazardType: target.hazardType || 'Hazard Zone',
+      eventType: 'DANGER_ENTRY',
+      timestamp: `Today, ${timeStr}`,
+      radiusMeters: target.radiusMeters || 300,
+      coords: target.coords,
+      note: `Simulated Entry Trigger: Crossed boundary into hazard zone "${target.name}" (${target.hazardType || 'Hazard'}). 60s countdown initiated.`,
+      isSimulated: true,
+    };
+    setGeofenceEventLogs((prev) => [entryLog, ...prev]);
+
+    setActiveDangerBreach({
+      zone: target,
+      enteredAt: timeStr,
+      remainingSeconds: 60,
+      status: 'warning',
+    });
+
+    addToast(
+      '⚠️ DANGER ZONE DETECTED (SIMULATED)',
+      `Simulated entry into ${target.name}. 60s safety verification running.`,
+      'warning'
+    );
+  };
+
+  const addDangerZone = (zoneData) => {
+    const newZone = {
+      id: 'dz-' + Date.now(),
+      name: zoneData.name.trim(),
+      hazardType: zoneData.hazardType || 'General Hazard',
+      coords: zoneData.coords || [23.5251, 77.8081],
+      radiusMeters: parseInt(zoneData.radiusMeters, 10) || 300,
+      isActive: zoneData.isActive !== false,
+      notes: zoneData.notes || '',
+    };
+    setDangerZones((prev) => [newZone, ...prev]);
+    addToast('Danger Zone Created', `"${newZone.name}" added to danger zones.`, 'success');
+    return newZone;
+  };
+
+  const editDangerZone = (id, updatedData) => {
+    setDangerZones((prev) =>
+      prev.map((z) => (z.id === id ? { ...z, ...updatedData } : z))
+    );
+    addToast('Danger Zone Updated', 'Hazard perimeter updated.', 'success');
+  };
+
+  const removeDangerZone = (id) => {
+    setDangerZones((prev) => prev.filter((z) => z.id !== id));
+    if (activeDangerBreach?.zone.id === id) {
+      setActiveDangerBreach(null);
+    }
+    addToast('Danger Zone Removed', 'Hazard zone removed from monitoring.', 'info');
+  };
+
+  const toggleDangerZone = (id) => {
+    setDangerZones((prev) =>
+      prev.map((z) => (z.id === id ? { ...z, isActive: !z.isActive } : z))
+    );
+  };
+
   const value = {
+    setThemeFamily,
+    setAppearance,
+    toggleTheme,
+    // Danger Zones
+    dangerZones,
+    activeDangerBreach,
+    evaluateDangerZones,
+    confirmDangerZoneSafe,
+    dismissDangerBreach,
+    simulateDangerZoneEntry,
+    addDangerZone,
+    editDangerZone,
+    removeDangerZone,
+    toggleDangerZone,
     activePage,
     setActivePage,
     activeJourneyId,
@@ -2078,13 +2660,21 @@ export function AppProvider({ children }) {
     addPackingItem,
     toggleItineraryItem,
     addExpenseToJourney,
+    deleteExpenseFromJourney,
     createJourney,
     editJourney,
     deleteJourney,
+    duplicateJourney,
     addSegmentToJourney,
     editSegmentInJourney,
     deleteSegmentFromJourney,
     reorderSegmentInJourney,
+    addStayToJourney,
+    deleteStayFromJourney,
+    addPlaceToJourney,
+    togglePlaceVisited,
+    deletePlaceFromJourney,
+    updateUserSettings,
     resetAllDemoData,
     exportJourneyData,
     // Overview Presentation Features

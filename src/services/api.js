@@ -121,6 +121,11 @@ export const api = {
         method: 'DELETE',
       }),
 
+    duplicate: (id) =>
+      request(`/journeys/${id}/duplicate`, {
+        method: 'POST',
+      }),
+
     // Segments inside a journey
     addSegment: (journeyId, segmentData) =>
       request(`/journeys/${journeyId}/segments`, {
@@ -182,6 +187,18 @@ export const api = {
       request(`/trusted-contacts/${id}`, {
         method: 'DELETE',
       }),
+  },
+
+  // Transport Discovery & Real Stays
+  transport: {
+    discover: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/transport/discover?${query}`, { method: 'GET' });
+    },
+    searchStays: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/transport/stays?${query}`, { method: 'GET' });
+    },
   },
 };
 

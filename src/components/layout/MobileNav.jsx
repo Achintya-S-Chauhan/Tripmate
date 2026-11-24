@@ -41,21 +41,21 @@ export default function MobileNav() {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[1500] md:hidden flex animate-fade-in">
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
 
-          <div className="relative w-72 max-w-[80vw] bg-[#0b1222] border-r border-slate-800 flex flex-col h-full z-10 p-4">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="relative w-72 max-w-[80vw] bg-travel-card border-r border-travel flex flex-col h-full z-10 p-4 text-travel-primary">
+            <div className="flex items-center justify-between pb-4 border-b border-travel">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center text-slate-950 font-black">
-                  <Compass className="w-5 h-5 text-slate-950" />
+                <div className="w-8 h-8 rounded-lg bg-travel-accent flex items-center justify-center text-[var(--accent-primary-fg)] font-black">
+                  <Compass className="w-4 h-4 text-[var(--accent-primary-fg)]" />
                 </div>
                 <div>
-                  <span className="font-extrabold text-white text-base block leading-tight">
-                    Trip<span className="text-teal-400">Mate</span>
+                  <span className="font-extrabold text-travel-primary text-base block leading-tight">
+                    Trip<span className="text-travel-accent">Mate</span>
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono truncate max-w-[130px] block">
+                  <span className="text-[10px] text-travel-secondary font-mono truncate max-w-[130px] block">
                     {isAuthenticated ? user.name : 'Guest Traveler'}
                   </span>
                 </div>
@@ -63,7 +63,7 @@ export default function MobileNav() {
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-travel-secondary hover:text-travel-primary hover:bg-travel-subtle transition"
                 aria-label="Close menu"
               >
                 <X className="w-5 h-5" />
@@ -75,7 +75,7 @@ export default function MobileNav() {
                 { id: 'overview', label: 'Overview', icon: Compass },
                 { id: 'journeys', label: 'My Journeys', icon: Map },
                 ...(activeJourney
-                  ? [{ id: 'trip-details', label: 'Active Trip Details', icon: Navigation2 }]
+                  ? [{ id: 'trip-details', label: 'Active Trip Workspace', icon: Navigation2 }]
                   : []),
                 { id: 'insights', label: 'Travel Insights', icon: BarChart3 },
                 { id: 'safety', label: 'Safety Center', icon: ShieldCheck },
@@ -95,18 +95,18 @@ export default function MobileNav() {
                     }}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm transition font-medium ${
                       isActive
-                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                        : 'text-slate-300 hover:bg-slate-800/60'
+                        ? 'bg-travel-accent-soft text-travel-accent font-bold border border-travel'
+                        : 'text-travel-secondary hover:text-travel-primary hover:bg-travel-subtle'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-teal-400' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-travel-accent' : 'text-travel-secondary'}`} />
                     <span>{item.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="pt-3 border-t border-slate-800 space-y-2">
+            <div className="pt-3 border-t border-travel space-y-2">
               {isAuthenticated ? (
                 <button
                   type="button"
@@ -114,9 +114,9 @@ export default function MobileNav() {
                     setIsMobileMenuOpen(false);
                     logoutUser();
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 border border-slate-700/60 text-rose-300 text-xs font-bold flex items-center justify-center gap-2 transition"
+                  className="w-full py-2.5 px-3 rounded-xl bg-travel-subtle hover:bg-rose-500/10 border border-travel text-rose-400 text-xs font-bold flex items-center justify-center gap-2 transition"
                 >
-                  <LogOut className="w-4 h-4 text-rose-400" />
+                  <LogOut className="w-4 h-4" />
                   <span>Sign Out</span>
                 </button>
               ) : (
@@ -126,7 +126,7 @@ export default function MobileNav() {
                     setIsMobileMenuOpen(false);
                     openAuthModal('login');
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 text-xs font-bold flex items-center justify-center gap-2 transition"
+                  className="w-full py-2.5 px-3 rounded-xl btn-travel-primary text-xs font-bold flex items-center justify-center gap-2 transition"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>Sign In for Cloud Sync</span>
@@ -138,7 +138,7 @@ export default function MobileNav() {
       )}
 
       {/* Floating Bottom Navigation Bar for Mobile */}
-      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-30 bg-[#0c1424]/95 backdrop-blur-lg border border-slate-700/80 rounded-2xl shadow-2xl px-2 py-1.5 flex items-center justify-around">
+      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-30 bg-travel-card/95 backdrop-blur-lg border border-travel rounded-2xl shadow-elevated px-2 py-1.5 flex items-center justify-around text-travel-primary">
         {primaryMobileNav.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
@@ -149,8 +149,8 @@ export default function MobileNav() {
               onClick={() => setActivePage(item.id)}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
                 isActive
-                  ? 'text-teal-400 font-bold bg-teal-500/10'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'text-travel-accent font-bold bg-travel-accent-soft'
+                  : 'text-travel-secondary hover:text-travel-primary'
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -165,8 +165,8 @@ export default function MobileNav() {
           onClick={() => setIsMobileMenuOpen(true)}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
             isMobileMenuOpen || activePage === 'saved-places' || activePage === 'settings'
-              ? 'text-teal-400 font-bold bg-teal-500/10'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-travel-accent font-bold bg-travel-accent-soft'
+              : 'text-travel-secondary hover:text-travel-primary'
           }`}
           title="More options"
           aria-label="More options"

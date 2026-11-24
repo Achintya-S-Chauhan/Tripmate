@@ -4,6 +4,7 @@ import {
   getJourneyById,
   createJourney,
   updateJourney,
+  duplicateJourney,
   deleteJourney,
   addSegment,
   updateSegment,
@@ -18,8 +19,8 @@ router.use(protect);
 
 router.route('/').get(getJourneys).post(createJourney);
 router.route('/:id').get(getJourneyById).put(updateJourney).delete(deleteJourney);
+router.route('/:id/duplicate').post(duplicateJourney);
 router.route('/:id/segments').post(addSegment);
 router.route('/:id/segments/:segmentId').put(updateSegment).delete(deleteSegment);
 
 export default router;
-

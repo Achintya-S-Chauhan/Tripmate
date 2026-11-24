@@ -81,28 +81,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="bg-[#0b1120] border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative overflow-hidden">
+      <div className="bg-travel-subtle border border-travel rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative overflow-hidden">
         {/* Decorative background glow */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-travel-accent-soft rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+          className="absolute top-5 right-5 p-2 rounded-xl text-travel-muted hover:text-travel-primary hover:bg-travel-subtle transition"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Modal Header */}
         <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-teal-500/20 mb-3">
-            <Compass className="w-7 h-7 text-slate-950 stroke-[2.5]" />
+          <div className="w-12 h-12 rounded-2xl bg-travel-accent flex items-center justify-center mx-auto shadow-lg shadow-sm mb-3">
+            <Compass className="w-7 h-7 text-[var(--accent-primary-fg)] stroke-[2.5]" />
           </div>
-          <h3 className="text-xl font-black text-white tracking-tight">
+          <h3 className="text-xl font-black text-travel-primary tracking-tight">
             {mode === 'login' ? 'Sign In to TripMate' : 'Join TripMate Explorer'}
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-travel-muted mt-1">
             {mode === 'login'
               ? 'Access your cloud-synced journeys, safe zones & safety vault.'
               : 'Create your explorer profile with live MongoDB cloud backup.'}
@@ -117,7 +117,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
         </div>
 
         {/* Mode Toggle Switch */}
-        <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-5">
+        <div className="grid grid-cols-2 p-1 bg-travel-subtle rounded-xl border border-travel mb-5">
           <button
             type="button"
             onClick={() => {
@@ -126,8 +126,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             }}
             className={`py-2 text-xs font-bold rounded-lg transition ${
               mode === 'login'
-                ? 'bg-teal-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'btn-travel-primary shadow-md'
+                : 'text-travel-muted hover:text-travel-primary'
             }`}
           >
             Sign In
@@ -140,8 +140,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             }}
             className={`py-2 text-xs font-bold rounded-lg transition ${
               mode === 'register'
-                ? 'bg-teal-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'btn-travel-primary shadow-md'
+                : 'text-travel-muted hover:text-travel-primary'
             }`}
           >
             Register
@@ -161,35 +161,35 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
           {mode === 'register' && (
             <>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                <label className="block text-[11px] font-semibold text-travel-secondary mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <UserIcon className="w-4 h-4 text-travel-muted absolute left-3 top-3" />
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Alex Sterling"
-                    className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition"
+                    className="w-full bg-travel-subtle border border-travel rounded-xl pl-9 pr-3 py-2.5 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent transition"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                <label className="block text-[11px] font-semibold text-travel-secondary mb-1">
                   Home City / Region
                 </label>
                 <div className="relative">
-                  <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <MapPin className="w-4 h-4 text-travel-muted absolute left-3 top-3" />
                   <input
                     type="text"
                     name="homeCity"
                     value={formData.homeCity}
                     onChange={handleChange}
                     placeholder="San Francisco, CA"
-                    className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition"
+                    className="w-full bg-travel-subtle border border-travel rounded-xl pl-9 pr-3 py-2.5 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent transition"
                   />
                 </div>
               </div>
@@ -197,35 +197,35 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
           )}
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+            <label className="block text-[11px] font-semibold text-travel-secondary mb-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <Mail className="w-4 h-4 text-travel-muted absolute left-3 top-3" />
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="alex.sterling@example.com"
-                className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition"
+                className="w-full bg-travel-subtle border border-travel rounded-xl pl-9 pr-3 py-2.5 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+            <label className="block text-[11px] font-semibold text-travel-secondary mb-1">
               Password
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 text-travel-muted absolute left-3 top-3" />
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder={mode === 'register' ? 'Min. 6 characters' : 'Enter your password'}
-                className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition"
+                className="w-full bg-travel-subtle border border-travel rounded-xl pl-9 pr-3 py-2.5 text-xs text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent transition"
               />
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-extrabold text-xs transition shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full mt-2 py-3 px-4 rounded-xl btn-travel-primary font-extrabold text-xs transition shadow-lg shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -250,8 +250,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
         </form>
 
         {/* Demo Fast Fill */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 text-center">
-          <p className="text-[11px] text-slate-500 mb-2">
+        <div className="mt-5 pt-4 border-t border-travel/80 text-center">
+          <p className="text-[11px] text-travel-muted mb-2">
             Evaluating for Student Major Project Presentation?
           </p>
           <button
@@ -266,7 +266,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
               setMode('register');
               setError('');
             }}
-            className="text-[11px] font-bold text-teal-400 hover:text-teal-300 underline underline-offset-2 transition"
+            className="text-[11px] font-bold text-travel-accent hover:text-travel-accent underline underline-offset-2 transition"
           >
             Click here to auto-fill sample credentials
           </button>

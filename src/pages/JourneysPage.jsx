@@ -2,50 +2,24 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus,
   Search,
-  Filter,
   Compass,
   ArrowRight,
-  Footprints,
-  Bus,
-  Train,
-  Coffee,
   Sparkles,
   Trash2,
   Edit3,
-  AlertTriangle,
-  Ship,
-  Bike,
   X,
-  CheckCircle2,
-  Loader2,
+  MapPin,
+  Calendar,
+  Layers,
+  Copy,
+  Hotel,
+  Route,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
+import LocationAutocomplete from '../components/common/LocationAutocomplete';
 import { searchLocation } from '../services/geocoding';
-
-// Helper to get transport mode icon
-function getSegmentIcon(type, mode) {
-  const t = (type || mode || '').toLowerCase();
-  if (t.includes('walk') || t.includes('foot') || t.includes('pedestrian') || t.includes('hike')) {
-    return <Footprints className="w-3.5 h-3.5 text-teal-400" />;
-  }
-  if (t.includes('bus')) {
-    return <Bus className="w-3.5 h-3.5 text-sky-400" />;
-  }
-  if (t.includes('train') || t.includes('rail') || t.includes('tram') || t.includes('shinkansen')) {
-    return <Train className="w-3.5 h-3.5 text-indigo-400" />;
-  }
-  if (t.includes('cafe') || t.includes('coffee') || t.includes('dining') || t.includes('rest')) {
-    return <Coffee className="w-3.5 h-3.5 text-amber-400" />;
-  }
-  if (t.includes('ferry') || t.includes('boat') || t.includes('ship')) {
-    return <Ship className="w-3.5 h-3.5 text-cyan-400" />;
-  }
-  if (t.includes('bike') || t.includes('bicycle')) {
-    return <Bike className="w-3.5 h-3.5 text-emerald-400" />;
-  }
-  return <Sparkles className="w-3.5 h-3.5 text-purple-400" />;
-}
+import { formatCurrency } from '../services/currency';
 
 export default function JourneysPage() {
   const {
@@ -53,6 +27,7 @@ export default function JourneysPage() {
     navigateToJourney,
     createJourney,
     editJourney,
+    duplicateJourney,
     deleteJourney,
     settings,
   } = useApp();
@@ -60,39 +35,36 @@ export default function JourneysPage() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatus, setActiveStatus] = useState('All'); // 'All' | 'In Progress' | 'Completed' | 'Upcoming' | 'Draft'
-  const [activeModeFilter, setActiveModeFilter] = useState('All'); // 'All' | 'Walking' | 'Bus' | 'Train' | 'Multimodal'
-  const [sortBy, setSortBy] = useState('date'); // 'date' | 'distance' | 'duration' | 'name'
+  const [sortBy, setSortBy] = useState('date'); // 'date' | 'distance' | 'name'
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingJourney, setEditingJourney] = useState(null);
   const [deletingJourney, setDeletingJourney] = useState(null);
 
-  // Form State for Create
-  const [createForm, setCreateForm] = useState(() => ({
+  // Form State for Simplified Create Trip
+  const [createForm, setCreateForm] = useState({
     title: '',
     origin: '',
     destination: '',
-    travelDate: new Date().toISOString().split('T')[0],
-    primaryTransportMode: 'Bus + Walking',
-    status: 'In Progress',
-    totalDistanceKm: '7.3',
-    totalDurationMinutes: '55',
-    summary: '',
-    transitLine: '',
-  }));
+    startDate: '',
+    endDate: '',
+  });
 
+  const [originLocation, setOriginLocation] = useState(null);
+  const [destinationLocation, setDestinationLocation] = useState(null);
   const [createErrors, setCreateErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State for Edit
   const [editForm, setEditForm] = useState({
     title: '',
     origin: '',
     destination: '',
-    travelDate: '',
-    primaryTransportMode: '',
+    startDate: '',
+    endDate: '',
     status: '',
-    summary: '',
+    notes: '',
   });
 
   const [editErrors, setEditErrors] = useState({});
@@ -110,166 +82,143 @@ export default function JourneysPage() {
           if (!statusMatch) return false;
         }
 
-        // Mode filter
-        if (activeModeFilter !== 'All') {
-          const modeStr = (
-            (j.primaryTransportMode || '') +
-            ' ' +
-            (j.transitTypes || []).join(' ') +
-            ' ' +
-            (j.segments || j.travelSegments || []).map((s) => s.type || s.mode).join(' ')
-          ).toLowerCase();
-
-          if (activeModeFilter === 'Walking' && !modeStr.includes('walk')) return false;
-          if (activeModeFilter === 'Bus' && !modeStr.includes('bus')) return false;
-          if (
-            activeModeFilter === 'Train' &&
-            !modeStr.includes('train') &&
-            !modeStr.includes('rail') &&
-            !modeStr.includes('tram')
-          )
-            return false;
-          if (activeModeFilter === 'Multimodal' && (j.segments?.length || j.travelSegments?.length || 0) < 2) return false;
-          if (activeModeFilter === 'Ferry' && !modeStr.includes('ferry') && !modeStr.includes('boat'))
-            return false;
-        }
-
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchTitle = (j.title || '').toLowerCase().includes(q);
           const matchOrigin = (j.origin || '').toLowerCase().includes(q);
           const matchDest = (j.destination || '').toLowerCase().includes(q);
-          const matchSummary = (j.summary || '').toLowerCase().includes(q);
-          const matchMode = (j.primaryTransportMode || '').toLowerCase().includes(q);
+          const matchNotes = (j.notes || j.summary || '').toLowerCase().includes(q);
           const segs = j.segments || j.travelSegments || [];
           const matchSegments = segs.some(
             (s) =>
               (s.title || '').toLowerCase().includes(q) ||
               (s.origin || s.from || '').toLowerCase().includes(q) ||
-              (s.destination || s.to || '').toLowerCase().includes(q) ||
-              (s.transitLine || '').toLowerCase().includes(q)
+              (s.destination || s.to || '').toLowerCase().includes(q)
           );
 
-          return (
-            matchTitle ||
-            matchOrigin ||
-            matchDest ||
-            matchSummary ||
-            matchMode ||
-            matchSegments
-          );
+          return matchTitle || matchOrigin || matchDest || matchNotes || matchSegments;
         }
 
         return true;
       })
       .sort((a, b) => {
+        const distA = Number(a.totalDistanceKm != null ? a.totalDistanceKm : a.distanceKm) || 0;
+        const distB = Number(b.totalDistanceKm != null ? b.totalDistanceKm : b.distanceKm) || 0;
         if (sortBy === 'distance') {
-          return (b.totalDistanceKm || b.distanceKm || 0) - (a.totalDistanceKm || a.distanceKm || 0);
-        }
-        if (sortBy === 'duration') {
-          return (b.totalDurationMinutes || 0) - (a.totalDurationMinutes || 0);
+          return distB - distA;
         }
         if (sortBy === 'name') {
           return (a.title || '').localeCompare(b.title || '');
         }
         // default: date newest first
-        const dateA = new Date(a.travelDate || a.startDate || '1970-01-01');
-        const dateB = new Date(b.travelDate || b.startDate || '1970-01-01');
+        const dateA = new Date(a.startDate || a.travelDate || '1970-01-01');
+        const dateB = new Date(b.startDate || b.travelDate || '1970-01-01');
         return dateB - dateA;
       });
-  }, [journeys, activeStatus, activeModeFilter, searchQuery, sortBy]);
+  }, [journeys, activeStatus, searchQuery, sortBy]);
 
-  // Validation for Create Form
-  const validateCreate = () => {
-    const errors = {};
-    if (!createForm.origin.trim()) errors.origin = 'Origin location is required';
-    if (!createForm.destination.trim()) errors.destination = 'Destination location is required';
-    if (!createForm.travelDate) errors.travelDate = 'Travel date is required';
-    if (isNaN(parseFloat(createForm.totalDistanceKm)) || parseFloat(createForm.totalDistanceKm) < 0) {
-      errors.totalDistanceKm = 'Must be a positive number';
-    }
-    if (isNaN(parseInt(createForm.totalDurationMinutes, 10)) || parseInt(createForm.totalDurationMinutes, 10) < 0) {
-      errors.totalDurationMinutes = 'Must be a positive number';
-    }
-    setCreateErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
+  // Handle Lightweight Create Submit
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!validateCreate()) return;
+    const errors = {};
 
-    // Resolve real geocoded coordinates for origin and destination if available
-    let waypoints = [];
-    let center = null;
+    const rawOrigin = createForm.origin.trim();
+    const rawDest = createForm.destination.trim();
 
-    try {
-      const [originMatches, destMatches] = await Promise.all([
-        searchLocation(createForm.origin.trim()),
-        searchLocation(createForm.destination.trim()),
-      ]);
-
-      if (originMatches && originMatches.length > 0) {
-        waypoints.push({
-          id: `wp-${Date.now()}-1`,
-          title: originMatches[0].name || createForm.origin.trim(),
-          category: 'origin',
-          coords: [originMatches[0].lat, originMatches[0].lng],
-          day: 1,
-          time: '09:00 AM',
-          completed: false,
-          isOrigin: true,
-        });
-        center = [originMatches[0].lat, originMatches[0].lng];
-      }
-
-      if (destMatches && destMatches.length > 0) {
-        waypoints.push({
-          id: `wp-${Date.now()}-2`,
-          title: destMatches[0].name || createForm.destination.trim(),
-          category: 'destination',
-          coords: [destMatches[0].lat, destMatches[0].lng],
-          day: 1,
-          time: '10:00 AM',
-          completed: false,
-          isDestination: true,
-        });
-        if (!center) center = [destMatches[0].lat, destMatches[0].lng];
-      }
-    } catch {
-      // Continue without geocoded waypoints if offline
+    if (!rawOrigin) {
+      errors.origin = 'Origin location is required';
+    }
+    if (!rawDest) {
+      errors.destination = 'Destination location is required';
     }
 
-    createJourney({
-      title: createForm.title.trim() || `${createForm.origin} ➔ ${createForm.destination}`,
-      origin: createForm.origin.trim(),
-      destination: createForm.destination.trim(),
-      travelDate: createForm.travelDate,
-      primaryTransportMode: createForm.primaryTransportMode,
-      status: createForm.status,
-      totalDistanceKm: parseFloat(createForm.totalDistanceKm) || 0,
-      totalDurationMinutes: parseInt(createForm.totalDurationMinutes, 10) || 0,
-      summary: createForm.summary.trim() || `Multi-modal structured trip chain from ${createForm.origin} to ${createForm.destination}.`,
-      transitLine: createForm.transitLine.trim() || null,
-      waypoints: waypoints.length > 0 ? waypoints : undefined,
-      center: center || undefined,
-    });
+    if (Object.keys(errors).length > 0) {
+      setCreateErrors(errors);
+      return;
+    }
 
-    setIsCreateOpen(false);
-    setCreateForm({
-      title: '',
-      origin: '',
-      destination: '',
-      travelDate: new Date().toISOString().split('T')[0],
-      primaryTransportMode: 'Bus + Walking',
-      status: 'In Progress',
-      totalDistanceKm: '7.3',
-      totalDurationMinutes: '55',
-      summary: '',
-      transitLine: '',
-    });
-    setCreateErrors({});
+    setIsSubmitting(true);
+
+    // Resolve coordinates if typed without clicking autocomplete suggestion
+    let resolvedOrigin = originLocation;
+    let resolvedDest = destinationLocation;
+
+    try {
+      if (!resolvedOrigin?.lat && rawOrigin) {
+        const matches = await searchLocation(rawOrigin, 1);
+        if (matches && matches.length > 0) {
+          resolvedOrigin = matches[0];
+        }
+      }
+      if (!resolvedDest?.lat && rawDest) {
+        const matches = await searchLocation(rawDest, 1);
+        if (matches && matches.length > 0) {
+          resolvedDest = matches[0];
+        }
+      }
+
+      const generatedTitle =
+        createForm.title.trim() || `${rawOrigin} ➔ ${rawDest}`;
+
+      const waypoints = [];
+      if (resolvedOrigin?.lat && resolvedOrigin?.lng) {
+        waypoints.push({
+          id: `wp-${Date.now()}-origin`,
+          title: resolvedOrigin.name || rawOrigin,
+          coords: [resolvedOrigin.lat, resolvedOrigin.lng],
+          category: 'origin',
+          isOrigin: true,
+          completed: false,
+        });
+      }
+      if (resolvedDest?.lat && resolvedDest?.lng) {
+        waypoints.push({
+          id: `wp-${Date.now()}-dest`,
+          title: resolvedDest.name || rawDest,
+          coords: [resolvedDest.lat, resolvedDest.lng],
+          category: 'destination',
+          isDestination: true,
+          completed: false,
+        });
+      }
+
+      const newTripData = {
+        title: generatedTitle,
+        origin: rawOrigin,
+        destination: rawDest,
+        startDate: createForm.startDate || '',
+        endDate: createForm.endDate || '',
+        travelDate: createForm.startDate || '',
+        isUndated: !createForm.startDate && !createForm.endDate,
+        status: 'Upcoming',
+        waypoints: waypoints,
+        segments: [], // Starts completely clean: no fake legs
+        stays: [],
+        places: [],
+        expenses: [],
+        center: resolvedDest?.lat ? [resolvedDest.lat, resolvedDest.lng] : [35.0, 135.0],
+        zoom: 12,
+        notes: '',
+      };
+
+      const created = await createJourney(newTripData);
+      setIsCreateOpen(false);
+      setCreateForm({
+        title: '',
+        origin: '',
+        destination: '',
+        startDate: '',
+        endDate: '',
+      });
+      setOriginLocation(null);
+      setDestinationLocation(null);
+      setCreateErrors({});
+    } catch (err) {
+      console.error('Failed to create trip:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Open Edit Modal
@@ -278,12 +227,12 @@ export default function JourneysPage() {
     setEditingJourney(journey);
     setEditForm({
       title: journey.title || '',
-      origin: journey.origin || journey.waypoints?.[0]?.title || '',
+      origin: journey.origin || '',
       destination: journey.destination || '',
-      travelDate: journey.travelDate || journey.startDate || '',
-      primaryTransportMode: journey.primaryTransportMode || 'Walking + Transit',
-      status: journey.status || 'In Progress',
-      summary: journey.summary || '',
+      startDate: journey.startDate || journey.travelDate || '',
+      endDate: journey.endDate || '',
+      status: journey.status || 'Upcoming',
+      notes: journey.notes || journey.summary || '',
     });
     setEditErrors({});
   };
@@ -292,7 +241,6 @@ export default function JourneysPage() {
     const errors = {};
     if (!editForm.origin.trim()) errors.origin = 'Origin location is required';
     if (!editForm.destination.trim()) errors.destination = 'Destination location is required';
-    if (!editForm.travelDate) errors.travelDate = 'Travel date is required';
     setEditErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -301,14 +249,16 @@ export default function JourneysPage() {
     e.preventDefault();
     if (!validateEdit() || !editingJourney) return;
 
-    editJourney(editingJourney.id, {
+    editJourney(editingJourney.id || editingJourney._id, {
       title: editForm.title.trim() || `${editForm.origin} ➔ ${editForm.destination}`,
       origin: editForm.origin.trim(),
       destination: editForm.destination.trim(),
-      travelDate: editForm.travelDate,
-      primaryTransportMode: editForm.primaryTransportMode,
+      startDate: editForm.startDate,
+      endDate: editForm.endDate,
+      travelDate: editForm.startDate,
+      isUndated: !editForm.startDate && !editForm.endDate,
       status: editForm.status,
-      summary: editForm.summary.trim(),
+      notes: editForm.notes.trim(),
     });
 
     setEditingJourney(null);
@@ -322,26 +272,20 @@ export default function JourneysPage() {
 
   const handleDeleteConfirm = () => {
     if (deletingJourney) {
-      deleteJourney(deletingJourney.id);
+      deleteJourney(deletingJourney.id || deletingJourney._id);
       setDeletingJourney(null);
     }
+  };
+
+  const handleDuplicate = async (journey, e) => {
+    e.stopPropagation();
+    await duplicateJourney(journey.id || journey._id);
   };
 
   const resetFilters = () => {
     setSearchQuery('');
     setActiveStatus('All');
-    setActiveModeFilter('All');
     setSortBy('date');
-  };
-
-  const formatDist = (km) => {
-    const num = Number(km) || 0;
-    if (settings?.distanceUnit === 'mi') {
-      const mi = (num * 0.621371).toFixed(1);
-      return `${Number(mi).toLocaleString()} mi`;
-    }
-    const cleanKm = Number.isInteger(num) ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    return `${cleanKm} km`;
   };
 
   return (
@@ -349,99 +293,85 @@ export default function JourneysPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-              <Compass className="w-6 h-6 text-teal-400" />
-              My Journeys
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-travel-primary tracking-tight flex items-center gap-2.5">
+              <Compass className="w-7 h-7 text-travel-accent" />
+              My Trips & Itineraries
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
-              {journeys.length} Planned
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-travel-subtle text-travel-secondary border border-travel font-mono">
+              {journeys.length} {journeys.length === 1 ? 'Trip' : 'Trips'}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Explore and manage your multi-modal itineraries, ordered segment chains, and travel legs.
+          <p className="text-xs sm:text-sm text-travel-secondary mt-1 max-w-2xl">
+            Create new trips, plan multi-leg transport routes, manage stays, and track travel expenses.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95 shrink-0"
+          onClick={() => {
+            setIsCreateOpen(true);
+            setCreateErrors({});
+          }}
+          className="px-5 py-2.5 rounded-xl btn-travel-primary text-xs sm:text-sm transition flex items-center gap-2 active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
-          <span>New Journey</span>
+          <span>New Trip</span>
         </button>
       </div>
 
-      {/* Streamlined Single Filter & Search Toolbar */}
-      <div className="bg-[#0f172a] p-3.5 rounded-2xl border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* Search & Filter Toolbar */}
+      <div className="bg-travel-card p-3.5 rounded-2xl border border-travel shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 text-travel-primary">
         {/* Search Input */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-travel-secondary absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by title, origin, destination, or transit line..."
+            placeholder="Search by trip name, origin, destination, or notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-9 py-2 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition"
+            className="w-full bg-travel-subtle border border-travel rounded-xl pl-9 pr-9 py-2 text-xs font-medium text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent transition"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-travel-secondary hover:text-travel-primary"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Dropdowns Row */}
+        {/* Filter Dropdowns */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Status Dropdown */}
           <select
             value={activeStatus}
             onChange={(e) => setActiveStatus(e.target.value)}
-            className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-teal-500"
+            className="bg-travel-subtle border border-travel rounded-xl px-3 py-2 text-xs font-semibold text-travel-primary focus:outline-none focus:border-travel-accent"
           >
             <option value="All">All Statuses</option>
+            <option value="Upcoming">Upcoming</option>
             <option value="In Progress">In Progress</option>
             <option value="Completed">Completed</option>
-            <option value="Upcoming">Upcoming</option>
             <option value="Draft">Draft</option>
           </select>
 
-          {/* Mode Dropdown */}
-          <select
-            value={activeModeFilter}
-            onChange={(e) => setActiveModeFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-teal-500"
-          >
-            <option value="All">All Modes</option>
-            <option value="Walking">Walking</option>
-            <option value="Bus">Bus</option>
-            <option value="Train">Electric Rail</option>
-            <option value="Multimodal">Multimodal</option>
-            <option value="Ferry">Ferry</option>
-          </select>
-
-          {/* Sort By Dropdown */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-teal-500"
+            className="bg-travel-subtle border border-travel rounded-xl px-3 py-2 text-xs font-semibold text-travel-primary focus:outline-none focus:border-travel-accent"
           >
             <option value="date">Date (Newest)</option>
-            <option value="distance">Distance (High to Low)</option>
-            <option value="duration">Duration (High to Low)</option>
+            <option value="distance">Distance</option>
             <option value="name">Title (A-Z)</option>
           </select>
 
-          {(searchQuery || activeStatus !== 'All' || activeModeFilter !== 'All') && (
+          {(searchQuery || activeStatus !== 'All') && (
             <button
               type="button"
               onClick={resetFilters}
-              className="text-xs text-teal-400 hover:underline font-semibold px-2 py-1"
+              className="text-xs text-travel-accent hover:underline font-semibold px-2 py-1"
             >
               Reset
             </button>
@@ -449,20 +379,20 @@ export default function JourneysPage() {
         </div>
       </div>
 
-      {/* Journeys Cards Grid or Empty State */}
+      {/* Trips Cards Grid or Empty State */}
       {filteredJourneys.length === 0 ? (
-        <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-12 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-teal-400">
+        <div className="bg-travel-card rounded-3xl border border-travel p-12 text-center space-y-4 shadow-sm text-travel-primary">
+          <div className="w-16 h-16 rounded-2xl bg-travel-subtle flex items-center justify-center mx-auto text-travel-accent">
             <Compass className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">
-              {journeys.length === 0 ? 'No Journeys Planned Yet' : 'No Matching Journeys Found'}
+            <h3 className="text-lg font-bold text-travel-primary">
+              {journeys.length === 0 ? 'No Trips Planned Yet' : 'No Matching Trips Found'}
             </h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+            <p className="text-xs text-travel-secondary mt-1 max-w-md mx-auto">
               {journeys.length === 0
-                ? 'Create your first expedition to start tracking multi-modal routes, waypoints, and carbon efficiency on real maps.'
-                : "We couldn't find any trips matching your current search or filters. Try adjusting your query."}
+                ? 'Create your first personal trip to explore transport connections, book stays, and track itinerary expenses.'
+                : "We couldn't find any trips matching your query. Try resetting your search."}
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 pt-2">
@@ -470,18 +400,21 @@ export default function JourneysPage() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition"
+                className="px-4 py-2 rounded-xl bg-travel-subtle hover:bg-travel-card border border-travel text-travel-secondary text-xs font-semibold transition"
               >
                 Reset Filters
               </button>
             )}
             <button
               type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20"
+              onClick={() => {
+                setIsCreateOpen(true);
+                setCreateErrors({});
+              }}
+              className="px-5 py-2.5 rounded-xl btn-travel-primary text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span>{journeys.length === 0 ? 'Plan Your First Journey' : 'Create Journey'}</span>
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>{journeys.length === 0 ? 'Plan Your First Trip' : 'Create Trip'}</span>
             </button>
           </div>
         </div>
@@ -489,40 +422,44 @@ export default function JourneysPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredJourneys.map((journey) => {
             const segments = journey.segments || journey.travelSegments || [];
-            const originTitle = journey.origin || journey.waypoints?.[0]?.title || 'Origin';
-            const destTitle = journey.destination || journey.waypoints?.[journey.waypoints.length - 1]?.title || 'Destination';
-            const dist = journey.totalDistanceKm || journey.distanceKm || 0;
+            const stays = journey.stays || [];
+            const places = journey.places || [];
+            const originTitle = journey.origin || 'Origin';
+            const destTitle = journey.destination || 'Destination';
 
             return (
               <div
                 key={journey.id || journey._id}
                 onClick={() => navigateToJourney(journey.id || journey._id)}
-                className="group relative bg-[#0f172a] rounded-2xl border border-slate-800 hover:border-teal-500/40 p-5 transition-all duration-200 hover:shadow-xl hover:shadow-teal-500/5 cursor-pointer flex flex-col justify-between"
+                className="group relative bg-travel-card rounded-2xl border border-travel hover:border-travel-strong p-5 transition-all duration-200 hover:shadow-md cursor-pointer flex flex-col justify-between text-travel-primary"
               >
                 <div>
                   {/* Top Status & Controls */}
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase flex items-center gap-1.5 ${
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase flex items-center gap-1.5 border ${
                           journey.status === 'In Progress' || journey.status === 'Active'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            ? 'bg-travel-accent-soft text-travel-accent border-travel'
                             : journey.status === 'Completed'
-                            ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                            ? 'bg-travel-subtle text-travel-secondary border-travel'
                             : journey.status === 'Draft'
-                            ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                            : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                            ? 'bg-travel-subtle text-travel-muted border-travel'
+                            : 'bg-travel-accent-soft text-travel-accent border-travel'
                         }`}
                       >
-                        {(journey.status === 'In Progress' || journey.status === 'Active') && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        )}
-                        {journey.status || 'Planned'}
+                        {journey.status || 'Upcoming'}
                       </span>
 
-                      {journey.travelDate && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 font-mono">
-                          {journey.travelDate}
+                      {journey.startDate ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-travel-subtle text-travel-secondary font-mono flex items-center gap-1 border border-travel">
+                          <Calendar className="w-3 h-3 text-travel-secondary" />
+                          {journey.startDate}
+                          {journey.endDate && journey.endDate !== journey.startDate ? ` ➔ ${journey.endDate}` : ''}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-travel-subtle text-travel-muted font-mono">
+                          Undated Trip
                         </span>
                       )}
                     </div>
@@ -530,65 +467,74 @@ export default function JourneysPage() {
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
+                        onClick={(e) => handleDuplicate(journey, e)}
+                        className="p-1.5 rounded-lg text-travel-secondary hover:text-travel-accent hover:bg-travel-subtle transition"
+                        title="Duplicate trip"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={(e) => openEditModal(journey, e)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-                        title="Edit journey details"
+                        className="p-1.5 rounded-lg text-travel-secondary hover:text-travel-primary hover:bg-travel-subtle transition"
+                        title="Edit trip details"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={(e) => openDeleteModal(journey, e)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
-                        title="Delete journey"
+                        className="p-1.5 rounded-lg text-travel-secondary hover:text-rose-500 hover:bg-travel-subtle transition"
+                        title="Delete trip"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* High-Contrast Title & Route */}
-                  <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors line-clamp-1">
+                  {/* Title & Route */}
+                  <h3 className="text-base font-bold text-travel-primary group-hover:text-travel-accent transition-colors line-clamp-1">
                     {journey.title}
                   </h3>
 
-                  <div className="mt-1.5 flex items-center gap-2 text-xs font-semibold text-slate-300">
-                    <span className="truncate max-w-[150px] sm:max-w-[180px] text-teal-400">
+                  <div className="mt-1.5 flex items-center gap-2 text-xs font-semibold text-travel-secondary">
+                    <span className="truncate max-w-[150px] sm:max-w-[180px] text-travel-accent">
                       {originTitle}
                     </span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className="truncate max-w-[150px] sm:max-w-[180px] text-slate-200">
+                    <ArrowRight className="w-3.5 h-3.5 text-travel-muted shrink-0" />
+                    <span className="truncate max-w-[150px] sm:max-w-[180px] text-travel-primary">
                       {destTitle}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                    {journey.summary || `Multi-modal structured journey connecting ${originTitle} to ${destTitle}.`}
-                  </p>
+                  {journey.notes && (
+                    <p className="text-xs text-travel-secondary mt-2 line-clamp-2 leading-relaxed">
+                      {journey.notes}
+                    </p>
+                  )}
                 </div>
 
-                {/* Card Footer: Metrics & Leg Mini-Chain */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-3 text-slate-400 font-mono text-[11px]">
-                    <span className="text-slate-200 font-semibold">{formatDist(dist)}</span>
+                {/* Card Footer: Metadata Counts & Action */}
+                <div className="mt-4 pt-3 border-t border-travel flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3 text-travel-secondary font-mono text-[11px]">
+                    <span className="flex items-center gap-1">
+                      <Route className="w-3 h-3 text-travel-secondary" />
+                      {segments.length} {segments.length === 1 ? 'Leg' : 'Legs'}
+                    </span>
                     <span>•</span>
-                    <span>{segments.length} {segments.length === 1 ? 'Leg' : 'Legs'}</span>
-                    {(() => {
-                      const co2Val = Number(journey.estimatedCo2Kg != null ? journey.estimatedCo2Kg : journey.co2SavedKg);
-                      if (co2Val != null && !isNaN(co2Val) && co2Val > 0) {
-                        return (
-                          <>
-                            <span>•</span>
-                            <span className="text-emerald-400">-{co2Val.toFixed(1)} kg CO₂</span>
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
+                    <span className="flex items-center gap-1">
+                      <Hotel className="w-3 h-3 text-travel-secondary" />
+                      {stays.length} {stays.length === 1 ? 'Stay' : 'Stays'}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-travel-secondary" />
+                      {places.length} {places.length === 1 ? 'Place' : 'Places'}
+                    </span>
                   </div>
 
-                  <span className="text-teal-400 text-xs font-bold group-hover:translate-x-1 transition flex items-center gap-1">
-                    <span>Details</span>
+                  <span className="text-travel-accent text-xs font-bold group-hover:translate-x-1 transition flex items-center gap-1">
+                    <span>Plan Trip</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -598,241 +544,226 @@ export default function JourneysPage() {
         </div>
       )}
 
-      {/* Create Journey Modal */}
+      {/* Simplified Initial Add Trip Modal */}
       {isCreateOpen && (
         <Modal
           isOpen={true}
           onClose={() => setIsCreateOpen(false)}
-          title="Create New Journey Chain"
-          subtitle="Define origin, destination, and baseline travel attributes."
+          title="Plan a New Trip"
+          subtitle="Define where you are going. You will discover transport options, add stays, and build your itinerary inside the trip workspace."
+          maxWidth="max-w-xl"
         >
-          <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs text-travel-primary">
+            {/* Trip Title (Optional) */}
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Journey Title</label>
+              <label className="block text-xs font-semibold text-travel-primary mb-1.5">
+                Trip Title
+                <span className="text-travel-muted font-normal ml-1.5">(Optional — defaults to route)</span>
+              </label>
               <input
                 type="text"
-                placeholder="e.g. Kyoto Cultural Odyssey"
+                placeholder="e.g. Summer Vacation in Tokyo, Weekend in Kyoto..."
                 value={createForm.title}
                 onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2.5 text-travel-primary placeholder:text-travel-muted focus:outline-none focus:border-travel-accent text-xs transition"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Origin *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Kyoto Central Station"
-                  value={createForm.origin}
-                  onChange={(e) => setCreateForm({ ...createForm, origin: e.target.value })}
-                  className={`w-full bg-slate-900 border rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500 ${
-                    createErrors.origin ? 'border-rose-500' : 'border-slate-700'
-                  }`}
-                />
-                {createErrors.origin && (
-                  <span className="text-rose-400 text-[10px] mt-0.5 block">{createErrors.origin}</span>
-                )}
-              </div>
+            {/* Origin & Destination Autocomplete */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <LocationAutocomplete
+                label="Origin Departure"
+                required
+                placeholder="Departure city or landmark..."
+                value={createForm.origin}
+                selectedLocation={originLocation}
+                onChange={(text) => {
+                  setCreateForm((prev) => ({ ...prev, origin: text }));
+                  if (!text) setOriginLocation(null);
+                }}
+                onSelect={(item) => {
+                  setOriginLocation(item);
+                  setCreateForm((prev) => ({ ...prev, origin: item ? item.name : '' }));
+                  if (createErrors.origin) setCreateErrors((prev) => ({ ...prev, origin: null }));
+                }}
+                error={createErrors.origin}
+                icon={MapPin}
+              />
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Destination *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Arashiyama Bamboo Grove"
-                  value={createForm.destination}
-                  onChange={(e) => setCreateForm({ ...createForm, destination: e.target.value })}
-                  className={`w-full bg-slate-900 border rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500 ${
-                    createErrors.destination ? 'border-rose-500' : 'border-slate-700'
-                  }`}
-                />
-                {createErrors.destination && (
-                  <span className="text-rose-400 text-[10px] mt-0.5 block">{createErrors.destination}</span>
-                )}
-              </div>
+              <LocationAutocomplete
+                label="Destination Arrival"
+                required
+                placeholder="Destination city or landmark..."
+                value={createForm.destination}
+                selectedLocation={destinationLocation}
+                onChange={(text) => {
+                  setCreateForm((prev) => ({ ...prev, destination: text }));
+                  if (!text) setDestinationLocation(null);
+                }}
+                onSelect={(item) => {
+                  setDestinationLocation(item);
+                  setCreateForm((prev) => ({ ...prev, destination: item ? item.name : '' }));
+                  if (createErrors.destination) setCreateErrors((prev) => ({ ...prev, destination: null }));
+                }}
+                error={createErrors.destination}
+                icon={Compass}
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Optional Travel Dates */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Date *</label>
+                <label className="block text-xs font-semibold text-travel-primary mb-1.5">
+                  Departure Date
+                  <span className="text-travel-muted font-normal ml-1.5">(Optional)</span>
+                </label>
                 <input
                   type="date"
-                  value={createForm.travelDate}
-                  onChange={(e) => setCreateForm({ ...createForm, travelDate: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white focus:outline-none focus:border-teal-500"
+                  value={createForm.startDate}
+                  onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })}
+                  className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2.5 text-travel-primary focus:outline-none focus:border-travel-accent text-xs transition"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Distance (km)</label>
+                <label className="block text-xs font-semibold text-travel-primary mb-1.5">
+                  Return Date
+                  <span className="text-travel-muted font-normal ml-1.5">(Optional)</span>
+                </label>
                 <input
-                  type="number"
-                  step="0.1"
-                  value={createForm.totalDistanceKm}
-                  onChange={(e) => setCreateForm({ ...createForm, totalDistanceKm: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Duration (min)</label>
-                <input
-                  type="number"
-                  value={createForm.totalDurationMinutes}
-                  onChange={(e) => setCreateForm({ ...createForm, totalDurationMinutes: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white focus:outline-none focus:border-teal-500"
+                  type="date"
+                  value={createForm.endDate}
+                  onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })}
+                  className="w-full bg-travel-subtle border border-travel rounded-xl px-3.5 py-2.5 text-travel-primary focus:outline-none focus:border-travel-accent text-xs transition"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Primary Mode</label>
-                <select
-                  value={createForm.primaryTransportMode}
-                  onChange={(e) => setCreateForm({ ...createForm, primaryTransportMode: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="Walking">Walking</option>
-                  <option value="Bus">Bus</option>
-                  <option value="Train">Electric Rail</option>
-                  <option value="Bus + Walking">Bus + Walking</option>
-                  <option value="Train + Walking">Train + Walking</option>
-                  <option value="Ferry">Ferry</option>
-                </select>
-              </div>
+            <p className="text-[11px] text-travel-secondary bg-travel-subtle p-2.5 rounded-xl border border-travel">
+              💡 You do not need to choose a transport mode now. Once your trip is created, you will explore real trains, buses, driving routes, and stays in your dedicated workspace.
+            </p>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Status</label>
-                <select
-                  value={createForm.status}
-                  onChange={(e) => setCreateForm({ ...createForm, status: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="In Progress">In Progress</option>
-                  <option value="Upcoming">Upcoming</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Draft">Draft</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Summary / Notes</label>
-              <textarea
-                rows={2}
-                placeholder="Brief description of route goals and waypoints..."
-                value={createForm.summary}
-                onChange={(e) => setCreateForm({ ...createForm, summary: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-travel">
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-travel-subtle hover:bg-travel-card border border-travel text-travel-secondary font-semibold text-xs transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold transition"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-xl btn-travel-primary disabled:opacity-50 text-xs transition flex items-center gap-1.5 active:scale-95"
               >
-                Create Journey
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Create Trip & Plan Itinerary</span>
               </button>
             </div>
           </form>
         </Modal>
       )}
 
-      {/* Edit Journey Modal */}
+      {/* Edit Trip Modal */}
       {editingJourney && (
         <Modal
           isOpen={true}
           onClose={() => setEditingJourney(null)}
           title={`Edit "${editingJourney.title}"`}
-          subtitle="Update route properties, status, or date."
+          subtitle="Update destination details, dates, or travel notes."
+          maxWidth="max-w-lg"
         >
-          <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleEditSubmit} className="space-y-4 text-xs text-travel-primary">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Title</label>
+              <label className="block text-travel-primary font-semibold mb-1">Trip Title</label>
               <input
                 type="text"
                 value={editForm.title}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-travel-subtle border border-travel rounded-xl p-2.5 text-travel-primary focus:outline-none focus:border-travel-accent"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Origin *</label>
+                <label className="block text-travel-primary font-semibold mb-1">Origin *</label>
                 <input
                   type="text"
                   value={editForm.origin}
                   onChange={(e) => setEditForm({ ...editForm, origin: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
+                  className="w-full bg-travel-subtle border border-travel rounded-xl p-2.5 text-travel-primary focus:outline-none focus:border-travel-accent"
                 />
+                {editErrors.origin && <span className="text-rose-500 text-[10px] mt-0.5 block">{editErrors.origin}</span>}
               </div>
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Destination *</label>
+                <label className="block text-travel-primary font-semibold mb-1">Destination *</label>
                 <input
                   type="text"
                   value={editForm.destination}
                   onChange={(e) => setEditForm({ ...editForm, destination: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
+                  className="w-full bg-travel-subtle border border-travel rounded-xl p-2.5 text-travel-primary focus:outline-none focus:border-travel-accent"
                 />
+                {editErrors.destination && <span className="text-rose-500 text-[10px] mt-0.5 block">{editErrors.destination}</span>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Date *</label>
+                <label className="block text-travel-primary font-semibold mb-1">Start Date</label>
                 <input
                   type="date"
-                  value={editForm.travelDate}
-                  onChange={(e) => setEditForm({ ...editForm, travelDate: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white focus:outline-none focus:border-teal-500"
+                  value={editForm.startDate}
+                  onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                  className="w-full bg-travel-subtle border border-travel rounded-xl p-2 text-travel-primary focus:outline-none focus:border-travel-accent"
                 />
               </div>
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="In Progress">In Progress</option>
-                  <option value="Upcoming">Upcoming</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Draft">Draft</option>
-                </select>
+                <label className="block text-travel-primary font-semibold mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={editForm.endDate}
+                  onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                  className="w-full bg-travel-subtle border border-travel rounded-xl p-2 text-travel-primary focus:outline-none focus:border-travel-accent"
+                />
               </div>
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Summary</label>
+              <label className="block text-travel-primary font-semibold mb-1">Status</label>
+              <select
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                className="w-full bg-travel-subtle border border-travel rounded-xl p-2.5 text-travel-primary focus:outline-none focus:border-travel-accent"
+              >
+                <option value="Upcoming">Upcoming</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Draft">Draft</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-travel-primary font-semibold mb-1">Trip Notes</label>
               <textarea
                 rows={2}
-                value={editForm.summary}
-                onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500"
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                className="w-full bg-travel-subtle border border-travel rounded-xl p-2.5 text-travel-primary focus:outline-none focus:border-travel-accent"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-travel">
               <button
                 type="button"
                 onClick={() => setEditingJourney(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                className="px-4 py-2 rounded-xl bg-travel-subtle hover:bg-travel-card border border-travel text-travel-secondary font-semibold"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold transition"
+                className="px-5 py-2 rounded-xl btn-travel-primary font-bold transition"
               >
                 Save Changes
               </button>
@@ -846,18 +777,18 @@ export default function JourneysPage() {
         <Modal
           isOpen={true}
           onClose={() => setDeletingJourney(null)}
-          title="Delete Journey Chain"
+          title="Delete Trip"
           subtitle={`Are you sure you want to remove "${deletingJourney.title}"?`}
         >
-          <div className="space-y-4 text-xs">
-            <p className="text-slate-300 leading-relaxed">
-              This action will remove the journey and its associated segment legs from your collection.
+          <div className="space-y-4 text-xs text-travel-primary">
+            <p className="text-travel-secondary leading-relaxed">
+              This action will remove the trip, all confirmed transport legs, stays, places, and associated expenses from your library.
             </p>
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-travel">
               <button
                 type="button"
                 onClick={() => setDeletingJourney(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                className="px-4 py-2 rounded-xl bg-travel-subtle hover:bg-travel-card border border-travel text-travel-secondary font-semibold"
               >
                 Cancel
               </button>
@@ -866,7 +797,7 @@ export default function JourneysPage() {
                 onClick={handleDeleteConfirm}
                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition"
               >
-                Delete Journey
+                Delete Trip
               </button>
             </div>
           </div>
