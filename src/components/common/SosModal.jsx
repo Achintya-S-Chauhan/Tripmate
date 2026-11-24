@@ -25,6 +25,7 @@ export default function SosModal() {
     endEmergencySession,
     emergencySession,
     trustedContacts,
+    isDemoMode,
   } = useApp();
 
   const isEmergency = emergencySession?.isActive;
@@ -194,11 +195,19 @@ export default function SosModal() {
                 </div>
 
                 <div className="bg-travel-subtle p-3 rounded-xl border border-travel">
-                  <span className="text-[10px] text-travel-muted uppercase font-bold block">Mock Dispatch</span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-base block mt-0.5">
-                    {emergencySession.mockAlertDeliveries?.length || 0} Delivered
+                  <span className="text-[10px] text-travel-muted uppercase font-bold block">Dispatch Status</span>
+                  {isDemoMode ? (
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-base block mt-0.5">
+                      {emergencySession.mockAlertDeliveries?.length || 0} Simulated
+                    </span>
+                  ) : (
+                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs block mt-1">
+                      0 Sent • Service Unavailable
+                    </span>
+                  )}
+                  <span className="text-[10px] text-travel-muted">
+                    {isDemoMode ? 'Demo Sandbox Active' : 'No External Gateway'}
                   </span>
-                  <span className="text-[10px] text-travel-muted">Simulated Active</span>
                 </div>
               </div>
 
@@ -206,7 +215,7 @@ export default function SosModal() {
               <div className="bg-travel-subtle rounded-xl p-3 border border-travel space-y-1">
                 <div className="flex items-center justify-between text-travel-muted text-[10px] uppercase font-bold">
                   <span className="flex items-center gap-1 text-travel-accent">
-                    <MapPin className="w-3 h-3" /> Sample Location Telemetry
+                    <MapPin className="w-3 h-3" /> Location Telemetry
                   </span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400">{emergencySession.sampleLocation?.accuracy}</span>
                 </div>
@@ -214,22 +223,30 @@ export default function SosModal() {
                   {emergencySession.sampleLocation?.name}
                 </div>
                 <div className="text-travel-muted text-[11px] font-mono">
-                  Coords: {emergencySession.sampleLocation?.coords ? emergencySession.sampleLocation.coords.join(', ') : '35.0037, 135.7770'}
+                  Coords: {emergencySession.sampleLocation?.coords ? emergencySession.sampleLocation.coords.join(', ') : '23.5350, 77.8150'}
                 </div>
               </div>
 
-              {/* Mock Alert Deliveries List */}
+              {/* Alert Deliveries List */}
               <div className="bg-travel-subtle rounded-xl p-3 border border-travel space-y-2">
                 <div className="text-[10px] font-bold text-travel-muted uppercase tracking-wider flex items-center justify-between">
-                  <span>Mock Alert Delivery Status</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">Simulation Complete</span>
+                  <span>Emergency Alert Recipients</span>
+                  <span className={isDemoMode ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                    {isDemoMode ? 'Simulation Active' : 'Gateway Unavailable'}
+                  </span>
                 </div>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
                   {emergencySession.mockAlertDeliveries?.map((item, idx) => (
                     <div key={idx} className="bg-travel-card p-2 rounded-lg border border-travel space-y-1">
                       <div className="flex items-center justify-between font-semibold text-travel-primary text-[11px]">
                         <span>{item.name}</span>
-                        <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.2 rounded font-mono font-bold">
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${
+                            item.status.includes('Not sent')
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          }`}
+                        >
                           {item.status}
                         </span>
                       </div>

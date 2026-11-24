@@ -53,6 +53,7 @@ export default function SafetyCenterPage() {
     sosLogs,
     activeJourney,
     addToast,
+    isDemoMode,
   } = useApp();
 
   const [expandedChecklist, setExpandedChecklist] = useState(0);
@@ -233,15 +234,15 @@ export default function SafetyCenterPage() {
             </div>
           </div>
 
-          {/* Mock Alert Delivery Status Breakdown */}
+          {/* Alert Delivery Status Breakdown */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-travel-primary uppercase tracking-wider flex items-center gap-2">
                 <Share2 className="w-3.5 h-3.5 text-travel-accent" />
-                Mock Alert Delivery Status ({emergencySession.mockAlertDeliveries?.length || 0} Contacts)
+                Emergency Alert Delivery Status ({emergencySession.mockAlertDeliveries?.length || 0} Contacts)
               </h4>
               <span className="text-[10px] text-travel-muted font-mono">
-                Client-side simulated dispatches
+                {isDemoMode ? 'Client simulated dispatches' : 'Local alert logs • External gateway unavailable'}
               </span>
             </div>
 
@@ -253,7 +254,13 @@ export default function SafetyCenterPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-travel-primary text-xs">{delivery.name}</span>
-                    <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-mono font-bold border border-emerald-500/20">
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                        delivery.status.includes('Not sent')
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                      }`}
+                    >
                       {delivery.status}
                     </span>
                   </div>
@@ -268,7 +275,9 @@ export default function SafetyCenterPage() {
 
                   <div className="flex items-center justify-between text-[10px] text-travel-muted pt-1">
                     <span>{delivery.relation || 'Emergency Contact'}</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-mono">Simulated</span>
+                    <span className="font-mono text-[10px] text-travel-muted">
+                      {delivery.status.includes('Not sent') ? 'Local Log Only' : 'Simulated'}
+                    </span>
                   </div>
                 </div>
               ))}

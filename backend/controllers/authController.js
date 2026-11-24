@@ -1,8 +1,5 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import Journey from '../models/Journey.js';
-import SavedPlace from '../models/SavedPlace.js';
-import TrustedContact from '../models/TrustedContact.js';
 
 // Helper to generate signed JWT token
 const generateToken = (userId) => {
@@ -12,259 +9,6 @@ const generateToken = (userId) => {
   const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
   return jwt.sign({ id: userId }, secret, { expiresIn });
-};
-
-// Seed initial starter data for a newly registered user
-const seedUserData = async (userId) => {
-  try {
-    // 1. Starter Journey (Kyoto Cultural Odyssey)
-    await Journey.create({
-      user: userId,
-      title: 'Kyoto Cultural Odyssey',
-      origin: 'Kansai International Airport (KIX)',
-      destination: 'Kyoto Cultural District',
-      travelDate: new Date().toISOString().split('T')[0],
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-      currentDay: 1,
-      totalDays: 4,
-      status: 'In Progress',
-      countryCode: 'JP',
-      primaryTransportMode: 'Haruka Express + Walking',
-      transitTypes: ['train', 'walking', 'bus'],
-      totalDistanceKm: 78.4,
-      totalDurationMinutes: 110,
-      estimatedCo2Kg: 5.6,
-      budget: 1800,
-      spent: 420,
-      center: [35.0037, 135.777],
-      zoom: 13,
-      currentLocation: {
-        name: 'The Celestine Hotel Gion Base',
-        coords: [34.9989, 135.7731],
-        updatedAgo: 'Just now',
-        safeZone: true,
-      },
-      hotelInfo: {
-        name: 'The Celestine Hotel Gion',
-        address: '572 Komatsucho, Higashiyama Ward, Kyoto 605-0931',
-        phone: '+81 75-532-3111',
-      },
-      localEmergencyNumbers: {
-        police: '110',
-        ambulance: '119',
-        campusSecurity: '075-753-2250',
-      },
-      waypoints: [
-        {
-          id: 'wp-1',
-          title: 'Kansai Airport Terminal 1',
-          category: 'origin',
-          coords: [34.4347, 135.2442],
-          day: 1,
-          time: '09:00 AM',
-          notes: 'Immigration & Kansai IC card pickup',
-          completed: true,
-          isOrigin: true,
-        },
-        {
-          id: 'wp-2',
-          title: 'JR Haruka Express Leg',
-          category: 'transit',
-          coords: [34.6937, 135.5023],
-          day: 1,
-          time: '10:15 AM',
-          notes: 'Direct limited express rail to Kyoto Station',
-          completed: true,
-        },
-        {
-          id: 'wp-3',
-          title: 'Kyoto Station Central Hub',
-          category: 'transit',
-          coords: [34.9858, 135.7588],
-          day: 1,
-          time: '10:45 AM',
-          notes: 'Transfer to municipal subway / taxi',
-          completed: true,
-        },
-        {
-          id: 'wp-4',
-          title: 'The Celestine Hotel Gion',
-          category: 'destination',
-          coords: [34.9989, 135.7731],
-          day: 1,
-          time: '11:30 AM',
-          notes: 'Luggage drop & initial safety base check-in',
-          completed: false,
-          isDestination: true,
-        },
-      ],
-      segments: [
-        {
-          id: 'seg-1',
-          order: 1,
-          type: 'train',
-          mode: 'Haruka Limited Express',
-          transportMode: 'Train',
-          title: 'Haruka Airport Express: KIX to Kyoto Central',
-          origin: 'Kansai Int Airport (KIX)',
-          destination: 'Kyoto Station Hub',
-          distanceKm: 75.0,
-          distanceMi: 46.6,
-          durationMinutes: 75,
-          duration: '1h 15m',
-          startTime: '09:30 AM',
-          endTime: '10:45 AM',
-          transitLine: 'JR West Haruka Line',
-          co2SavedKg: 14.2,
-          isStop: false,
-          status: 'Completed',
-          notes: 'Clean electric express rail. Ticket verified.',
-        },
-        {
-          id: 'seg-2',
-          order: 2,
-          type: 'walking',
-          mode: 'Walking',
-          transportMode: 'Walking',
-          title: 'Scenic Historic Walk to Gion Lodging',
-          origin: 'Kyoto Station Karasuma Exit',
-          destination: 'The Celestine Hotel Gion',
-          distanceKm: 3.4,
-          distanceMi: 2.1,
-          durationMinutes: 35,
-          duration: '35m',
-          startTime: '10:55 AM',
-          endTime: '11:30 AM',
-          transitLine: 'Pedestrian Green Way',
-          co2SavedKg: 0.6,
-          isStop: false,
-          status: 'In Progress',
-          notes: 'Walk past Kamo River and Kennin-ji temple grounds.',
-        },
-      ],
-      travelSegments: [
-        {
-          id: 'seg-1',
-          order: 1,
-          type: 'train',
-          mode: 'Haruka Limited Express',
-          transportMode: 'Train',
-          title: 'Haruka Airport Express: KIX to Kyoto Central',
-          origin: 'Kansai Int Airport (KIX)',
-          destination: 'Kyoto Station Hub',
-          distanceKm: 75.0,
-          distanceMi: 46.6,
-          durationMinutes: 75,
-          duration: '1h 15m',
-          startTime: '09:30 AM',
-          endTime: '10:45 AM',
-          transitLine: 'JR West Haruka Line',
-          co2SavedKg: 14.2,
-          isStop: false,
-          status: 'Completed',
-        },
-        {
-          id: 'seg-2',
-          order: 2,
-          type: 'walking',
-          mode: 'Walking',
-          transportMode: 'Walking',
-          title: 'Scenic Historic Walk to Gion Lodging',
-          origin: 'Kyoto Station Karasuma Exit',
-          destination: 'The Celestine Hotel Gion',
-          distanceKm: 3.4,
-          distanceMi: 2.1,
-          durationMinutes: 35,
-          duration: '35m',
-          startTime: '10:55 AM',
-          endTime: '11:30 AM',
-          transitLine: 'Pedestrian Green Way',
-          co2SavedKg: 0.6,
-          isStop: false,
-          status: 'In Progress',
-        },
-      ],
-    });
-
-    // 2. Starter Saved Places / Geofence Zones
-    await SavedPlace.create([
-      {
-        user: userId,
-        name: 'The Celestine Hotel Gion',
-        category: 'Hotel',
-        city: 'Kyoto',
-        country: 'Japan',
-        address: '572 Komatsucho, Higashiyama Ward, Kyoto 605-0931',
-        rating: 4.9,
-        hours: '24/7 Front Desk',
-        tags: ['Hotel Base', 'Concierge', 'Safe Haven'],
-        notes: 'Primary lodging base with 24h assistance and English-speaking staff.',
-        radiusMeters: 250,
-        lat: 34.9989,
-        lng: 135.7731,
-        isMustVisit: true,
-      },
-      {
-        user: userId,
-        name: 'Kyoto Prefectural Police Foreign Desk',
-        category: 'Checkpoint',
-        city: 'Kyoto',
-        country: 'Japan',
-        address: 'Kamigyo Ward, Yabunouchicho 85-3',
-        rating: 4.9,
-        hours: '24 Hours Emergency',
-        tags: ['24/7 Police', 'Lost & Found', 'English Support'],
-        notes: 'Dedicated consular desk for foreign visitors and emergency filings.',
-        radiusMeters: 300,
-        lat: 35.021,
-        lng: 135.754,
-        isMustVisit: false,
-      },
-      {
-        user: userId,
-        name: 'Kyoto Central Rail Hub',
-        category: 'Transit Hub',
-        city: 'Kyoto',
-        country: 'Japan',
-        address: 'Shimogyo Ward, Higashishiokojicho',
-        rating: 4.8,
-        hours: '05:00 AM - 11:45 PM',
-        tags: ['Shinkansen', 'Bus Terminal', 'Medical Clinic'],
-        notes: 'Main transit interchange with JR lines, subways, and airport express.',
-        radiusMeters: 500,
-        lat: 34.9858,
-        lng: 135.7588,
-        isMustVisit: false,
-      },
-    ]);
-
-    // 3. Starter Trusted Contacts
-    await TrustedContact.create([
-      {
-        user: userId,
-        name: 'Morgan Sterling',
-        relation: 'Spouse / Primary Contact',
-        phone: '+1 (415) 555-0192',
-        email: 'morgan.s@example.com',
-        notifyOnSos: true,
-        status: 'Verified Contact',
-        channels: ['Simulated SMS', 'Relay Ping'],
-      },
-      {
-        user: userId,
-        name: 'David Sterling',
-        relation: 'Brother / Alternate Contact',
-        phone: '+1 (415) 555-0144',
-        email: 'david.s@example.com',
-        notifyOnSos: true,
-        status: 'Verified Contact',
-        channels: ['Simulated SMS'],
-      },
-    ]);
-  } catch (error) {
-    console.error('⚠️ [Seed Error] Could not seed starter data for new user:', error.message);
-  }
 };
 
 // @desc    Register a new user
@@ -302,7 +46,7 @@ export const register = async (req, res, next) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      homeCity: homeCity?.trim() || 'Vidisha, Madhya Pradesh',
+      homeCity: homeCity?.trim() || 'Vidisha',
       homeCountry: 'India',
       avatarUrl:
         avatarUrl ||
@@ -312,17 +56,14 @@ export const register = async (req, res, next) => {
         tempUnit: 'C',
         currency: 'INR',
         homeCountry: 'India',
-        dateFormat: 'DD/MM/YYYY',
-        timeFormat: '24h',
+        dateFormat: 'DD-MM-YYYY',
+        timeFormat: '12h',
         locale: 'en-IN',
         theme: 'forest',
         themeFamily: 'forest',
         appearance: 'dark',
       },
     });
-
-    // User created with clean initial state - no mock records seeded
-    // Newly registered accounts start with an empty database
 
     // Issue JWT
     const token = generateToken(user._id);
@@ -401,23 +142,41 @@ export const getMe = async (req, res, next) => {
     }
 
     // Safe migration: upgrade legacy US defaults to India defaults without touching custom settings
-    if (user.homeCity === 'San Francisco, CA' && (user.homeCountry === 'United States' || !user.homeCountry)) {
-      user.homeCity = 'Vidisha, Madhya Pradesh';
+    let shouldSave = false;
+    if (!user.homeCity || user.homeCity === 'San Francisco, CA' || user.homeCity.toUpperCase() === 'VIDISHA') {
+      user.homeCity = 'Vidisha';
+      shouldSave = true;
+    }
+    if (!user.homeCountry || user.homeCountry === 'United States') {
       user.homeCountry = 'India';
-      if (!user.settings) user.settings = {};
-      if (user.settings.currency === 'USD' || !user.settings.currency) {
-        user.settings.currency = 'INR';
-      }
-      if (user.settings.homeCountry === 'United States' || !user.settings.homeCountry) {
-        user.settings.homeCountry = 'India';
-      }
-      if (user.settings.dateFormat === 'YYYY-MM-DD' || !user.settings.dateFormat) {
-        user.settings.dateFormat = 'DD/MM/YYYY';
-      }
-      if (user.settings.timeFormat === '12h' || !user.settings.timeFormat) {
-        user.settings.timeFormat = '24h';
-      }
-      user.settings.locale = 'en-IN';
+      shouldSave = true;
+    }
+    if (!user.settings) user.settings = {};
+    if (!user.settings.currency || user.settings.currency === 'USD') {
+      user.settings.currency = 'INR';
+      shouldSave = true;
+    }
+    if (!user.settings.homeCountry || user.settings.homeCountry === 'United States') {
+      user.settings.homeCountry = 'India';
+      shouldSave = true;
+    }
+    if (!user.settings.dateFormat || user.settings.dateFormat === 'YYYY-MM-DD' || user.settings.dateFormat === 'DD/MM/YYYY') {
+      user.settings.dateFormat = 'DD-MM-YYYY';
+      shouldSave = true;
+    }
+    if (!user.settings.timeFormat || user.settings.timeFormat === '24h') {
+      user.settings.timeFormat = '12h';
+      shouldSave = true;
+    }
+    if (!user.settings.distanceUnit) {
+      user.settings.distanceUnit = 'km';
+      shouldSave = true;
+    }
+    if (!user.settings.tempUnit) {
+      user.settings.tempUnit = 'C';
+      shouldSave = true;
+    }
+    if (shouldSave) {
       await user.save();
     }
 
@@ -482,4 +241,3 @@ export const updateProfile = async (req, res, next) => {
     next(error);
   }
 };
-

@@ -68,7 +68,7 @@ export default function DangerZoneBanner() {
           ) : (
             <div className="flex items-center gap-1.5 font-mono text-[11px] bg-rose-900/80 px-2.5 py-0.5 rounded-md border border-rose-500/50 text-rose-100">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-300" />
-              <span>60s Expired: Simulated Distress Packet Dispatched</span>
+              <span>60s Expired: Escalation Logged (Notification Service Unavailable)</span>
             </div>
           )}
 

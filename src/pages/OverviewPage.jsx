@@ -20,6 +20,26 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
+// Helper to deduplicate distinct legs so total distance is never multiplied by duplicate records
+const getDistinctLegs = (segments = []) => {
+  if (!Array.isArray(segments)) return [];
+  const seen = new Set();
+  const distinct = [];
+  for (const s of segments) {
+    if (!s) continue;
+    const origin = (s.origin || s.from || '').trim().toLowerCase();
+    const destination = (s.destination || s.to || '').trim().toLowerCase();
+    const mode = (s.transportMode || s.mode || s.type || '').trim().toLowerCase();
+    const dist = parseFloat(s.distanceKm) || 0;
+    const key = `${origin}-->${destination}::${mode}::${dist.toFixed(1)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      distinct.push(s);
+    }
+  }
+  return distinct;
+};
+
 export default function OverviewPage() {
   const {
     user,
@@ -98,7 +118,8 @@ export default function OverviewPage() {
     let draft = 0;
 
     journeys.forEach((j) => {
-      const segs = j.segments || j.travelSegments || [];
+      const rawSegs = j.segments || j.travelSegments || [];
+      const segs = getDistinctLegs(rawSegs);
       const jDist =
         segs.length > 0
           ? segs.reduce((sum, s) => sum + (Number(s.distanceKm) || 0), 0)
@@ -158,12 +179,13 @@ export default function OverviewPage() {
 
   const currentLeg = travelSegments[currentSegmentIndex] || travelSegments[0];
 
-  // Derive total distance strictly from active journey's segments (or fallback totalDistanceKm)
+  // Derive total distance strictly from active journey's distinct segments (or fallback totalDistanceKm)
   const activeJourneyTotalDist = useMemo(() => {
     if (!activeJourney) return 0;
-    if (travelSegments.length > 0) {
+    const distinctSegs = getDistinctLegs(travelSegments);
+    if (distinctSegs.length > 0) {
       return parseFloat(
-        travelSegments.reduce((sum, s) => sum + (Number(s.distanceKm) || 0), 0).toFixed(1)
+        distinctSegs.reduce((sum, s) => sum + (Number(s.distanceKm) || 0), 0).toFixed(1)
       );
     }
     return Number(

@@ -5,14 +5,14 @@ export const INITIAL_USER = {
   name: "Alex Sterling",
   handle: "@alex_travels",
   email: "alex.sterling@example.com",
-  homeCity: "Vidisha, Madhya Pradesh",
+  homeCity: "Vidisha",
   homeCountry: "India",
-  membership: "TripMate Explorer Pro",
+  membership: "TripMate Explorer",
   avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80",
   safeTravelScore: 98,
-  totalJourneys: 14,
-  countriesVisited: 19,
-  carbonOffsetKg: 340,
+  totalJourneys: 0,
+  countriesVisited: 1,
+  carbonOffsetKg: 0,
 };
 
 export const INITIAL_SETTINGS = {
@@ -25,10 +25,10 @@ export const INITIAL_SETTINGS = {
   currencySymbol: "₹",
   country: "India",
   countryCode: "IN",
-  homeCity: "Vidisha, Madhya Pradesh",
+  homeCity: "Vidisha",
   homeCountry: "India",
-  dateFormat: "DD/MM/YYYY",
-  timeFormat: "24h",
+  dateFormat: "DD-MM-YYYY",
+  timeFormat: "12h",
   locale: "en-IN",
   safetySensitivity: "Standard", // 'Discreet', 'Standard', 'High Alert'
   autoCheckinInterval: "8h", // 'Off', '4h', '8h', '24h'

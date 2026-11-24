@@ -371,6 +371,19 @@ export function AppProvider({ children }) {
     }
   });
 
+  // Purge any legacy demo geofence events for authenticated accounts
+  useEffect(() => {
+    if (isAuthenticated) {
+      setGeofenceEventLogs((prev) =>
+        prev.filter((log) => {
+          const note = (log.note || '').toLowerCase();
+          const name = (log.placeName || '').toLowerCase();
+          return !log.isSimulated && !note.includes('kyoto') && !name.includes('kyoto') && !note.includes('japan');
+        })
+      );
+    }
+  }, [isAuthenticated, user?._id]);
+
   // Monitored Danger Zones (hazard perimeters for real-world geofencing)
   const [dangerZones, setDangerZones] = useState(() => {
     try {
@@ -486,11 +499,12 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.GEOFENCE_LOGS, JSON.stringify(geofenceEventLogs));
+      const key = user?._id || user?.id ? `tripmate_geofence_logs_${user._id || user.id}` : STORAGE_KEYS.GEOFENCE_LOGS;
+      localStorage.setItem(key, JSON.stringify(geofenceEventLogs));
     } catch (e) {
       console.warn('LocalStorage save failed', e);
     }
-  }, [geofenceEventLogs]);
+  }, [geofenceEventLogs, user?._id, user?.id]);
 
   useEffect(() => {
     try {
@@ -521,22 +535,17 @@ export function AppProvider({ children }) {
               timestamp: `Today, ${timeStr}`,
               radiusMeters: prev.zone.radiusMeters || 300,
               coords: prev.zone.coords,
-              note: `AUTOMATIC ESCALATION: 60s safety timer expired without confirmation in hazard zone "${prev.zone.name}" (${prev.zone.hazardType || 'Hazard'}). Trusted emergency contacts alerted (Simulated client relay).`,
-              isSimulated: true,
+              note: `AUTOMATIC ESCALATION: 60s safety timer expired without confirmation in hazard zone "${prev.zone.name}" (${prev.zone.hazardType || 'Hazard'}). Not sent — notification service unavailable (No external SMS gateway configured).`,
+              isSimulated: isDemoMode,
             };
             setGeofenceEventLogs((l) => [escalationLog, ...l]);
 
             // Single clear alert
-            const toastId = 't-' + Date.now();
-            setToasts([{
-              id: toastId,
-              title: 'EMERGENCY ESCALATION DISPATCHED (SIMULATED)',
-              message: `60s expired in danger zone "${prev.zone.name}". Simulated distress telemetry dispatched to trusted contacts.`,
-              type: 'error',
-            }]);
-            setTimeout(() => {
-              setToasts((t) => t.filter((x) => x.id !== toastId));
-            }, 3000);
+            addToast(
+              'EMERGENCY ESCALATION RECORDED',
+              `60s expired in hazard zone "${prev.zone.name}". Local alert logged; external notification service unavailable.`,
+              'error'
+            );
 
             return {
               ...prev,
@@ -1180,15 +1189,31 @@ export function AppProvider({ children }) {
 
   // Helper to recalculate journey distance, duration and CO2 totals
   const calculateJourneyTotals = (segments = []) => {
+    // Deduplicate distinct segments by signature so route distance is never multiplied by duplicate records
+    const seen = new Set();
+    const distinct = [];
+    for (const s of segments) {
+      if (!s) continue;
+      const origin = (s.origin || s.from || '').trim().toLowerCase();
+      const destination = (s.destination || s.to || '').trim().toLowerCase();
+      const mode = (s.transportMode || s.mode || s.type || '').trim().toLowerCase();
+      const dist = parseFloat(s.distanceKm) || 0;
+      const key = `${origin}-->${destination}::${mode}::${dist.toFixed(1)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        distinct.push(s);
+      }
+    }
+
     const totalDistanceKm = parseFloat(
-      segments.reduce((acc, s) => acc + (parseFloat(s.distanceKm) || 0), 0).toFixed(1)
+      distinct.reduce((acc, s) => acc + (parseFloat(s.distanceKm) || 0), 0).toFixed(1)
     );
-    const totalDurationMinutes = segments.reduce(
+    const totalDurationMinutes = distinct.reduce(
       (acc, s) => acc + (parseInt(s.durationMinutes, 10) || 0),
       0
     );
     const estimatedCo2Kg = parseFloat(
-      segments.reduce((acc, s) => acc + (parseFloat(s.co2SavedKg) || 0), 0).toFixed(1)
+      distinct.reduce((acc, s) => acc + (parseFloat(s.co2SavedKg) || 0), 0).toFixed(1)
     );
     return { totalDistanceKm, totalDurationMinutes, estimatedCo2Kg };
   };
@@ -1350,6 +1375,8 @@ export function AppProvider({ children }) {
 
   // Add Segment to Journey
   const addSegmentToJourney = async (journeyId, segmentData) => {
+    const originStr = segmentData.origin || segmentData.from || 'Origin';
+    const destStr = segmentData.destination || segmentData.to || 'Destination';
     const dist = parseFloat(segmentData.distanceKm) || 0;
     const dur = parseInt(segmentData.durationMinutes, 10) || 0;
     const mode = segmentData.transportMode || segmentData.mode || 'Walking';
@@ -1358,6 +1385,28 @@ export function AppProvider({ children }) {
     const co2Saved = segmentData.co2SavedKg !== undefined 
       ? parseFloat(segmentData.co2SavedKg) 
       : parseFloat((dist * (type === 'walking' || type === 'bicycle' ? 0.21 : 0.14)).toFixed(1));
+
+    // Prevent duplicate legs from being added to the same journey
+    const targetJourney = journeys.find((j) => j.id === journeyId || j._id === journeyId);
+    if (targetJourney) {
+      const existing = targetJourney.segments || targetJourney.travelSegments || [];
+      const newOrigin = originStr.trim().toLowerCase();
+      const newDest = destStr.trim().toLowerCase();
+      const newMode = (mode || type).trim().toLowerCase();
+
+      const isDuplicate = existing.some((s) => {
+        const o = (s.origin || s.from || '').trim().toLowerCase();
+        const d = (s.destination || s.to || '').trim().toLowerCase();
+        const m = (s.transportMode || s.mode || s.type || '').trim().toLowerCase();
+        const sDist = parseFloat(s.distanceKm) || 0;
+        return o === newOrigin && d === newDest && (m === newMode || Math.abs(sDist - dist) < 0.1);
+      });
+
+      if (isDuplicate) {
+        addToast('Leg Already in Itinerary', `"${originStr} ➔ ${destStr}" is already part of this itinerary.`, 'info');
+        return targetJourney;
+      }
+    }
 
     if (isAuthenticated && isBackendConnected) {
       try {
@@ -1944,37 +1993,58 @@ export function AppProvider({ children }) {
     if (bypassCountdown) {
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const hasLiveLoc = Boolean(activeJourney?.currentLocation?.coords);
       const sampleLoc = {
-        name: activeJourney?.currentLocation?.name || 'Gion District Safe Transit Hub, Kyoto',
-        address: activeJourney?.hotelInfo?.address || '572 Komatsucho, Higashiyama Ward, Kyoto 605-0931',
-        coords: activeJourney?.currentLocation?.coords || [35.0037, 135.7770],
-        accuracy: '±8m (Simulated Client GPS)',
-        region: activeJourney?.destination || 'Kyoto, Japan (Demo Coordinates)',
+        name: activeJourney?.currentLocation?.name || (user?.homeCity ? `${user.homeCity} Area` : 'Vidisha Area'),
+        address: activeJourney?.hotelInfo?.address || (user?.homeCity ? `${user.homeCity}, India` : 'Vidisha, India'),
+        coords: activeJourney?.currentLocation?.coords || [23.5350, 77.8150],
+        accuracy: hasLiveLoc ? '±12m (Device GPS)' : 'Default Location (GPS not active)',
+        region: user?.homeCountry || 'India',
+        obtained: hasLiveLoc,
       };
 
-      // Generate mock alert deliveries for trusted contacts marked for SOS
       const activeContacts = trustedContacts.filter((c) => c.notifyOnSos !== false);
-      const deliveries = activeContacts.map((c) => ({
-        contactId: c.id,
-        name: c.name,
-        phone: c.phone,
-        relation: c.relation,
-        channel: 'Simulated SMS Relay',
-        status: 'Delivered (Simulated Demo)',
-        timestamp: 'Just now',
-        payloadPreview: `TRIPMATE SIMULATED SOS: Distress broadcast initiated for Alex Sterling at ${sampleLoc.name} (${sampleLoc.coords.join(', ')}). ICE health profile attached. [DEMO SIMULATION ONLY]`,
-      }));
+      const isDemo = isDemoMode;
 
-      // Include consular mission alert
-      deliveries.push({
-        contactId: 'emb-consular-desk',
-        name: 'US Consulate General Osaka-Kobe Citizen Support',
-        phone: '+81 3-3224-5000',
-        channel: 'Consular Wire Relay',
-        status: 'Relay Queued (Simulation)',
-        timestamp: 'Just now',
-        payloadPreview: `DIPLOMATIC CITIZEN ALERT: Simulated citizen distress packet logged for Alex Sterling. Coordinates: ${sampleLoc.coords.join(', ')}.`,
-      });
+      let deliveries = [];
+      if (isDemo) {
+        deliveries = [
+          {
+            contactId: 'demo-1',
+            name: 'Primary Contact (Demo Simulation)',
+            phone: '+91 98765 43210',
+            relation: 'Family',
+            channel: 'Simulated SMS Relay',
+            status: 'Delivered (Demo Mode Only)',
+            timestamp: 'Just now',
+            payloadPreview: `TRIPMATE DEMO SOS: Distress broadcast simulation for ${user?.name || 'Traveler'} at ${sampleLoc.name}. [DEMO SIMULATION ONLY]`,
+          },
+        ];
+      } else if (activeContacts.length > 0) {
+        deliveries = activeContacts.map((c) => ({
+          contactId: c.id || c._id,
+          name: c.name,
+          phone: c.phone,
+          relation: c.relation,
+          channel: 'SMS Gateway',
+          status: 'Not sent — notification service unavailable (No SMS gateway configured)',
+          timestamp: 'Just now',
+          payloadPreview: `TRIPMATE EMERGENCY SOS: Distress alert for ${user?.name || 'Traveler'} at ${sampleLoc.name} (${sampleLoc.coords.join(', ')}). No SMS gateway configured.`,
+        }));
+      } else {
+        deliveries = [
+          {
+            contactId: 'none',
+            name: 'No Trusted Contacts Configured',
+            phone: 'N/A',
+            relation: 'Alert Service',
+            channel: 'Internal Notice',
+            status: 'Not sent — no contacts configured',
+            timestamp: 'Just now',
+            payloadPreview: 'No emergency contacts have been added to your profile. Please add contacts in the Safety Center.',
+          },
+        ];
+      }
 
       setEmergencySession({
         isActive: true,
@@ -1983,16 +2053,16 @@ export function AppProvider({ children }) {
         elapsedSeconds: 0,
         sampleLocation: sampleLoc,
         mockAlertDeliveries: deliveries,
-        medicalIceSummary: 'Blood: O+ | Allergies: Penicillin | Policy: Allianz #AG-9428-TRAVEL-PRO',
+        medicalIceSummary: 'Regional Emergency Service: 112 (India) | Medical Profile: Standard',
       });
 
       const newSosLog = {
         id: 'sos-' + Date.now(),
         timestamp: `Today, ${timeStr}`,
-        type: 'SIMULATED EMERGENCY SOS BROADCAST',
+        type: isDemo ? 'DEMO EMERGENCY SOS BROADCAST' : 'EMERGENCY SOS ALERT',
         location: `${sampleLoc.name} (${sampleLoc.coords.join(', ')})`,
-        contactsAlerted: deliveries.map((d) => `${d.name} (${d.phone})`),
-        status: 'Simulated Emergency Session Running',
+        contactsAlerted: deliveries.map((d) => `${d.name} (${d.phone}) - ${d.status}`),
+        status: isDemo ? 'Demo Emergency Session Running' : 'Emergency Session Active (Local Broadcast Only)',
       };
 
       setSosLogs((prev) => [newSosLog, ...prev]);
@@ -2001,8 +2071,10 @@ export function AppProvider({ children }) {
       setSosActive(true);
 
       addToast(
-        'SIMULATED EMERGENCY SESSION ACTIVE',
-        'Demonstration mode active. Live elapsed timer & mock alert delivery console started. Real emergency lines are NEVER contacted.',
+        isDemo ? 'DEMO EMERGENCY SESSION ACTIVE' : 'EMERGENCY SOS ACTIVATED',
+        isDemo
+          ? 'Demonstration mode active. Real emergency lines are NEVER contacted.'
+          : 'Emergency protocol active. External notification service is unavailable; alert logged locally.',
         'warning'
       );
     } else {
@@ -2388,6 +2460,9 @@ export function AppProvider({ children }) {
   // Evaluate Danger Zones against GPS position
   const evaluateDangerZones = useCallback((userCoords, accuracy = 20) => {
     if (!userCoords || userCoords.length !== 2 || isNaN(userCoords[0]) || isNaN(userCoords[1])) return;
+    // Buffer against inaccurate GPS signals (>80m accuracy is too coarse for precise perimeter monitoring)
+    if (accuracy > 80) return;
+
     const [uLat, uLng] = userCoords;
     const now = Date.now();
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2398,7 +2473,7 @@ export function AppProvider({ children }) {
       if (!zoneCoords || zoneCoords.length !== 2 || isNaN(zoneCoords[0]) || isNaN(zoneCoords[1])) return;
 
       const dist = calculateDistanceMeters(uLat, uLng, zoneCoords[0], zoneCoords[1]);
-      const effectiveRadius = (zone.radiusMeters || 300) + Math.min(accuracy || 20, 25);
+      const effectiveRadius = zone.radiusMeters || 300;
       const isInside = dist <= effectiveRadius;
       const wasInside = insideDangerZonesRef.current.has(zone.id);
 
@@ -2420,7 +2495,7 @@ export function AppProvider({ children }) {
             radiusMeters: zone.radiusMeters || 300,
             coords: userCoords,
             note: `WARNING: Entered hazard zone "${zone.name}" (${zone.hazardType || 'Hazard'}, ${zone.radiusMeters || 300}m radius). 60s safety countdown initiated.`,
-            isSimulated: true,
+            isSimulated: isDemoMode,
           };
           setGeofenceEventLogs((prev) => [entryLog, ...prev]);
 
@@ -2451,7 +2526,7 @@ export function AppProvider({ children }) {
           radiusMeters: zone.radiusMeters || 300,
           coords: userCoords,
           note: `Departed hazard zone "${zone.name}". Safety countdown aborted.`,
-          isSimulated: true,
+          isSimulated: isDemoMode,
         };
         setGeofenceEventLogs((prev) => [exitLog, ...prev]);
 
@@ -2463,7 +2538,7 @@ export function AppProvider({ children }) {
         );
       }
     });
-  }, [dangerZones]);
+  }, [dangerZones, isDemoMode]);
 
   // Action: User confirms "I'm Safe"
   const confirmDangerZoneSafe = () => {
@@ -2486,7 +2561,7 @@ export function AppProvider({ children }) {
       radiusMeters: zone.radiusMeters || 300,
       coords: zone.coords,
       note: `User confirmed safety in hazard zone "${zone.name}". Escalation suppressed for 15 minutes.`,
-      isSimulated: true,
+      isSimulated: isDemoMode,
     };
     setGeofenceEventLogs((prev) => [safeLog, ...prev]);
 

@@ -1,32 +1,46 @@
 import Journey from '../models/Journey.js';
 
-// Helper to recalculate distance, duration, and CO2 from segments
-const recalculateJourneyTotals = (segments = []) => {
+// Helper to recalculate distance, duration, and CO2 from distinct, valid segments only
+export const recalculateJourneyTotals = (segments = []) => {
   let totalDistanceKm = 0;
   let totalDurationMinutes = 0;
   let estimatedCo2Kg = 0;
+  const seenSignatures = new Set();
+  const distinctSegments = [];
 
   segments.forEach((seg) => {
+    const o = (seg.origin || seg.from || '').trim().toLowerCase();
+    const d = (seg.destination || seg.to || '').trim().toLowerCase();
+    const m = (seg.type || seg.transportMode || seg.mode || '').trim().toLowerCase();
     const dist = parseFloat(seg.distanceKm) || 0;
     const dur = parseInt(seg.durationMinutes, 10) || 0;
-    totalDistanceKm += dist;
-    totalDurationMinutes += dur;
 
-    // Standard DEFRA emissions: Car ~171g/km, Train ~35g/km, Bus ~89g/km, Walk/Bike 0g/km
-    const type = (seg.type || seg.mode || '').toLowerCase();
-    let factor = 0.089;
-    if (type.includes('walk') || type.includes('bike') || type.includes('foot')) factor = 0;
-    else if (type.includes('train') || type.includes('rail')) factor = 0.035;
-    else if (type.includes('car')) factor = 0.171;
-    else if (type.includes('flight')) factor = 0.244;
+    // Unique route leg signature
+    const sig = `${o}-->${d}::${m}::${dist.toFixed(1)}`;
 
-    estimatedCo2Kg += dist * factor;
+    if (!seenSignatures.has(sig)) {
+      seenSignatures.add(sig);
+      distinctSegments.push(seg);
+      totalDistanceKm += dist;
+      totalDurationMinutes += dur;
+
+      // Standard emissions factor
+      const type = (seg.type || seg.mode || '').toLowerCase();
+      let factor = 0.089;
+      if (type.includes('walk') || type.includes('bike') || type.includes('foot')) factor = 0;
+      else if (type.includes('train') || type.includes('rail')) factor = 0.035;
+      else if (type.includes('car')) factor = 0.171;
+      else if (type.includes('flight')) factor = 0.244;
+
+      estimatedCo2Kg += dist * factor;
+    }
   });
 
   return {
     totalDistanceKm: parseFloat(totalDistanceKm.toFixed(1)),
     totalDurationMinutes,
     estimatedCo2Kg: parseFloat(estimatedCo2Kg.toFixed(2)),
+    distinctSegments,
   };
 };
 
@@ -35,9 +49,61 @@ const recalculateJourneyTotals = (segments = []) => {
 // @access  Private
 export const getJourneys = async (req, res, next) => {
   try {
+    // 1. Purge known demo seeded trips from authenticated accounts
+    await Journey.deleteMany({
+      user: req.user._id,
+      $or: [
+        { isDemoData: true },
+        {
+          title: {
+            $in: [
+              'Kyoto Cultural Odyssey',
+              'Morning Campus & Research Commute',
+              'Alpine Transit Chain',
+              'Amalfi Coastal Ferry & Cliffside Transit',
+            ],
+          },
+        },
+      ],
+    });
+
     const journeys = await Journey.find({ user: req.user._id }).sort({
       createdAt: -1,
     });
+
+    // 2. Safe migration: Clean up duplicate segments on existing journeys (e.g. repeated IRCTC legs)
+    for (const journey of journeys) {
+      if (Array.isArray(journey.segments) && journey.segments.length > 1) {
+        const seen = new Set();
+        const unique = [];
+        let hasDuplicates = false;
+
+        for (const seg of journey.segments) {
+          const o = (seg.origin || seg.from || '').trim().toLowerCase();
+          const d = (seg.destination || seg.to || '').trim().toLowerCase();
+          const m = (seg.type || seg.transportMode || seg.mode || '').trim().toLowerCase();
+          const dist = (parseFloat(seg.distanceKm) || 0).toFixed(1);
+          const sig = `${o}-->${d}::${m}::${dist}`;
+
+          if (seen.has(sig)) {
+            hasDuplicates = true;
+          } else {
+            seen.add(sig);
+            unique.push(seg);
+          }
+        }
+
+        if (hasDuplicates) {
+          journey.segments = unique.map((s, idx) => ({ ...s, order: idx + 1 }));
+          journey.travelSegments = journey.segments;
+          const totals = recalculateJourneyTotals(journey.segments);
+          journey.totalDistanceKm = totals.totalDistanceKm;
+          journey.totalDurationMinutes = totals.totalDurationMinutes;
+          journey.estimatedCo2Kg = totals.estimatedCo2Kg;
+          await journey.save();
+        }
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -378,6 +444,31 @@ export const addSegment = async (req, res, next) => {
 
     const dist = parseFloat(distanceKm) || 0;
     const dur = parseInt(durationMinutes, 10) || 0;
+
+    // Prevent duplicate transport legs from accidental repeated submissions or duplicate requests
+    const isDuplicate = Array.isArray(journey.segments) && journey.segments.some((s) => {
+      const o1 = (s.origin || s.from || '').trim().toLowerCase();
+      const d1 = (s.destination || s.to || '').trim().toLowerCase();
+      const o2 = origin.trim().toLowerCase();
+      const d2 = destination.trim().toLowerCase();
+      const m1 = (s.type || s.transportMode || s.mode || '').trim().toLowerCase();
+      const m2 = (type || transportMode || mode || '').trim().toLowerCase();
+      const t1 = (s.title || '').trim().toLowerCase();
+      const t2 = title.trim().toLowerCase();
+      const distDiff = Math.abs((parseFloat(s.distanceKm) || 0) - dist);
+
+      return (o1 === o2 && d1 === d2 && (m1 === m2 || t1 === t2 || distDiff < 0.5)) || (t1 === t2 && distDiff < 0.5);
+    });
+
+    if (isDuplicate) {
+      return res.status(200).json({
+        success: true,
+        message: 'Transport leg already exists in itinerary. Duplicate prevented.',
+        journey,
+        isDuplicate: true,
+      });
+    }
+
     const order = (journey.segments?.length || 0) + 1;
 
     const newSegment = {

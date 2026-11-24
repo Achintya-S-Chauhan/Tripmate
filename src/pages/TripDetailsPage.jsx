@@ -130,8 +130,26 @@ export default function TripDetailsPage() {
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveryResults, setDiscoveryResults] = useState(null);
   const [discoveryTab, setDiscoveryTab] = useState('alternatives');
+  const [addingLegKey, setAddingLegKey] = useState(null);
 
-  // Progressive Ranking & Fallbacks for Transport Alternatives
+  // Helper to check if a discovered transit option or road route is already present in this trip's legs
+  const isLegAlreadyAdded = (leg) => {
+    if (!leg) return false;
+    const origin = (leg.origin || leg.from || activeJourney?.origin || '').trim().toLowerCase();
+    const dest = (leg.destination || leg.to || activeJourney?.destination || '').trim().toLowerCase();
+    const mode = (leg.transportMode || leg.mode || leg.type || '').trim().toLowerCase();
+    const dist = parseFloat(leg.distanceKm) || 0;
+
+    return segments.some((s) => {
+      const sOrigin = (s.origin || s.from || '').trim().toLowerCase();
+      const sDest = (s.destination || s.to || '').trim().toLowerCase();
+      const sMode = (s.transportMode || s.mode || s.type || '').trim().toLowerCase();
+      const sDist = parseFloat(s.distanceKm) || 0;
+      return sOrigin === origin && sDest === dest && (sMode === mode || Math.abs(sDist - dist) < 0.1);
+    });
+  };
+
+  // Progressive Ranking & Fallbacks for Transport Alternatives using OR logic
   const rankedAlternatives = useMemo(() => {
     if (!discoveryResults?.alternatives || !Array.isArray(discoveryResults.alternatives)) {
       return [];
@@ -142,48 +160,56 @@ export default function TripDetailsPage() {
       maxWalkingMinutes: 20,
     };
 
+    const maxWalk = prefs.maxWalkingMinutes || 20;
+    const hasAnyPreference = Boolean(prefs.preferDirect || prefs.preferFewerTransfers || prefs.maxWalkingMinutes);
+
     const scored = discoveryResults.alternatives.map((alt) => {
       let score = 50;
       const badges = [];
+      let matchedAnyPreference = false;
 
-      // Direct & Transfers scoring
+      // 1. Direct alternative preference match
       if (prefs.preferDirect) {
         if (alt.transfers === 0) {
-          score += 40;
+          score += 35;
+          matchedAnyPreference = true;
           badges.push({ text: 'Direct Route Match', type: 'match' });
-        } else {
-          score -= 15;
-          badges.push({
-            text: `Alternative with ${alt.transfers} transfer${alt.transfers === 1 ? '' : 's'}`,
-            type: 'alternative',
-          });
         }
-      } else if (prefs.preferFewerTransfers) {
+      }
+
+      // 2. Fewer transfers preference match (independent alternative OR condition)
+      if (prefs.preferFewerTransfers) {
         if (alt.transfers === 0) {
           score += 30;
-          badges.push({ text: '0 Transfers (Optimal)', type: 'match' });
-        } else {
-          score += Math.max(0, (2 - alt.transfers) * 12);
-          badges.push({
-            text: `${alt.transfers} Transfer${alt.transfers === 1 ? '' : 's'}`,
-            type: 'info',
-          });
+          matchedAnyPreference = true;
+          if (!prefs.preferDirect) {
+            badges.push({ text: '0 Transfers (Optimal)', type: 'match' });
+          }
+        } else if (alt.transfers <= 1) {
+          score += 20;
+          matchedAnyPreference = true;
+          badges.push({ text: 'Low Transfers (1 Transfer)', type: 'match' });
         }
       }
 
-      // Max walking minutes threshold evaluation
-      const maxWalk = prefs.maxWalkingMinutes || 20;
-      if (alt.walkingMinutes <= maxWalk) {
-        score += 20;
-      } else {
-        score -= 20;
-        badges.push({
-          text: `Walking segment slightly longer (${alt.walkingMinutes}m vs ${maxWalk}m pref)`,
-          type: 'relaxed',
-        });
+      // 3. Max walking minutes preference match (independent alternative OR condition)
+      if (prefs.maxWalkingMinutes) {
+        if (alt.walkingMinutes <= maxWalk) {
+          score += 25;
+          matchedAnyPreference = true;
+          badges.push({ text: `Walking ≤ ${maxWalk}m Match`, type: 'match' });
+        }
       }
 
-      if (badges.length === 0) {
+      // If route satisfies preferences (either/OR), explain boost; if not, explain why it ranks lower without discarding it
+      if (hasAnyPreference && !matchedAnyPreference) {
+        badges.push({
+          text: alt.transfers > 0 
+            ? `Alternative (${alt.transfers} transfer${alt.transfers === 1 ? '' : 's'}, ${alt.walkingMinutes}m walk)`
+            : `Alternative (${alt.walkingMinutes}m walk)`,
+          type: 'alternative',
+        });
+      } else if (badges.length === 0) {
         badges.push({ text: 'Recommended Corridor Match', type: 'match' });
       }
 
@@ -312,9 +338,23 @@ export default function TripDetailsPage() {
     return expenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
   }, [expenses]);
 
-  // Total distance
+  // Total distance strictly from distinct legs (never multiply distance due to duplicate records)
   const totalTripDistanceKm = useMemo(() => {
-    return parseFloat(segments.reduce((sum, s) => sum + (parseFloat(s.distanceKm) || 0), 0).toFixed(1));
+    const seen = new Set();
+    const distinct = [];
+    for (const s of segments) {
+      if (!s) continue;
+      const origin = (s.origin || s.from || '').trim().toLowerCase();
+      const destination = (s.destination || s.to || '').trim().toLowerCase();
+      const mode = (s.transportMode || s.mode || s.type || '').trim().toLowerCase();
+      const dist = parseFloat(s.distanceKm) || 0;
+      const key = `${origin}-->${destination}::${mode}::${dist.toFixed(1)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        distinct.push(s);
+      }
+    }
+    return parseFloat(distinct.reduce((sum, s) => sum + (parseFloat(s.distanceKm) || 0), 0).toFixed(1));
   }, [segments]);
 
   // Check schedule conflicts between consecutive legs
@@ -380,39 +420,53 @@ export default function TripDetailsPage() {
 
   // Add real OSRM route option directly as a leg
   const handleAddDiscoveredRoute = async (routeOption) => {
-    if (!routeOption) return;
+    if (!routeOption || addingLegKey) return;
+    const legKey = routeOption.source || `${routeOption.from}_${routeOption.to}_${routeOption.mode}`;
+    if (isLegAlreadyAdded(routeOption)) return;
 
-    await addSegmentToJourney(activeJourney.id || activeJourney._id, {
-      title: routeOption.title,
-      origin: routeOption.from || activeJourney.origin,
-      destination: routeOption.to || activeJourney.destination,
-      type: routeOption.mode.toLowerCase().includes('walk') ? 'walking' : 'car',
-      transportMode: routeOption.mode,
-      distanceKm: routeOption.distanceKm,
-      durationMinutes: routeOption.durationMinutes,
-      operator: routeOption.operator,
-      transfers: 0,
-      source: routeOption.source,
-      geometry: routeOption.geometry,
-    });
+    setAddingLegKey(legKey);
+    try {
+      await addSegmentToJourney(activeJourney.id || activeJourney._id, {
+        title: routeOption.title,
+        origin: routeOption.from || activeJourney.origin,
+        destination: routeOption.to || activeJourney.destination,
+        type: routeOption.mode.toLowerCase().includes('walk') ? 'walking' : 'car',
+        transportMode: routeOption.mode,
+        distanceKm: routeOption.distanceKm,
+        durationMinutes: routeOption.durationMinutes,
+        operator: routeOption.operator,
+        transfers: 0,
+        source: routeOption.source,
+        geometry: routeOption.geometry,
+      });
+    } finally {
+      setAddingLegKey(null);
+    }
   };
 
   // Add a ranked corridor transit alternative directly as a leg
   const handleAddDiscoveredAlternative = async (alt) => {
-    if (!alt) return;
+    if (!alt || addingLegKey) return;
+    const legKey = alt.id || `${alt.origin || activeJourney.origin}_${alt.destination || activeJourney.destination}_${alt.mode}`;
+    if (isLegAlreadyAdded(alt)) return;
 
-    await addSegmentToJourney(activeJourney.id || activeJourney._id, {
-      title: alt.title,
-      origin: alt.origin || activeJourney.origin,
-      destination: alt.destination || activeJourney.destination,
-      type: alt.type,
-      transportMode: alt.mode,
-      operator: alt.operator,
-      distanceKm: alt.distanceKm,
-      durationMinutes: alt.durationMinutes,
-      transfers: alt.transfers,
-      source: alt.source || 'Corridor Route',
-    });
+    setAddingLegKey(legKey);
+    try {
+      await addSegmentToJourney(activeJourney.id || activeJourney._id, {
+        title: alt.title,
+        origin: alt.origin || activeJourney.origin,
+        destination: alt.destination || activeJourney.destination,
+        type: alt.type,
+        transportMode: alt.mode,
+        operator: alt.operator,
+        distanceKm: alt.distanceKm,
+        durationMinutes: alt.durationMinutes,
+        transfers: alt.transfers,
+        source: alt.source || 'Corridor Route',
+      });
+    } finally {
+      setAddingLegKey(null);
+    }
   };
 
   // Search Real Stays near Destination via OpenStreetMap
@@ -1219,13 +1273,25 @@ export default function TripDetailsPage() {
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleAddDiscoveredAlternative(alt)}
-                            className="px-4 py-2 rounded-xl btn-travel-primary text-xs font-bold transition active:scale-95 shrink-0 self-start sm:self-center"
-                          >
-                            Add to Itinerary
-                          </button>
+                          {(() => {
+                            const alreadyAdded = isLegAlreadyAdded(alt);
+                            const altKey = alt.id || `${alt.origin || activeJourney.origin}_${alt.destination || activeJourney.destination}_${alt.mode}`;
+                            const isAdding = addingLegKey === altKey;
+                            return (
+                              <button
+                                type="button"
+                                disabled={alreadyAdded || isAdding || Boolean(addingLegKey)}
+                                onClick={() => handleAddDiscoveredAlternative(alt)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 self-start sm:self-center ${
+                                  alreadyAdded
+                                    ? 'bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-default'
+                                    : 'btn-travel-primary active:scale-95'
+                                }`}
+                              >
+                                {alreadyAdded ? 'Added ✓' : isAdding ? 'Adding...' : 'Add to Itinerary'}
+                              </button>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -1249,13 +1315,25 @@ export default function TripDetailsPage() {
                           {formatDistance(discoveryResults.driving.distanceKm, settings?.distanceUnit)} • {discoveryResults.driving.durationFormatted}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAddDiscoveredRoute(discoveryResults.driving)}
-                        className="px-4 py-2 rounded-xl btn-travel-primary text-xs transition active:scale-95 shrink-0"
-                      >
-                        Add to Itinerary
-                      </button>
+                      {(() => {
+                        const roadAlreadyAdded = isLegAlreadyAdded(discoveryResults.driving);
+                        const roadKey = discoveryResults.driving.source || `${discoveryResults.driving.from}_${discoveryResults.driving.to}_${discoveryResults.driving.mode}`;
+                        const isAddingRoad = addingLegKey === roadKey;
+                        return (
+                          <button
+                            type="button"
+                            disabled={roadAlreadyAdded || isAddingRoad || Boolean(addingLegKey)}
+                            onClick={() => handleAddDiscoveredRoute(discoveryResults.driving)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 ${
+                              roadAlreadyAdded
+                                ? 'bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-default'
+                                : 'btn-travel-primary active:scale-95'
+                            }`}
+                          >
+                            {roadAlreadyAdded ? 'Added ✓' : isAddingRoad ? 'Adding...' : 'Add to Itinerary'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <p className="text-travel-muted">Road routing unavailable for these coordinates.</p>
@@ -1279,13 +1357,25 @@ export default function TripDetailsPage() {
                           {formatDistance(discoveryResults.walking.distanceKm, settings?.distanceUnit)} • {discoveryResults.walking.durationFormatted}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAddDiscoveredRoute(discoveryResults.walking)}
-                        className="px-4 py-2 rounded-xl btn-travel-primary text-xs transition active:scale-95 shrink-0"
-                      >
-                        Add to Itinerary
-                      </button>
+                      {(() => {
+                        const walkAlreadyAdded = isLegAlreadyAdded(discoveryResults.walking);
+                        const walkKey = discoveryResults.walking.source || `${discoveryResults.walking.from}_${discoveryResults.walking.to}_${discoveryResults.walking.mode}`;
+                        const isAddingWalk = addingLegKey === walkKey;
+                        return (
+                          <button
+                            type="button"
+                            disabled={walkAlreadyAdded || isAddingWalk || Boolean(addingLegKey)}
+                            onClick={() => handleAddDiscoveredRoute(discoveryResults.walking)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 ${
+                              walkAlreadyAdded
+                                ? 'bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-default'
+                                : 'btn-travel-primary active:scale-95'
+                            }`}
+                          >
+                            {walkAlreadyAdded ? 'Added ✓' : isAddingWalk ? 'Adding...' : 'Add to Itinerary'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <p className="text-travel-muted">Pedestrian connection routing unavailable.</p>

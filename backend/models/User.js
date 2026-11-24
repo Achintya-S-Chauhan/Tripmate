@@ -33,7 +33,7 @@ const UserSchema = new mongoose.Schema(
     },
     homeCity: {
       type: String,
-      default: 'Vidisha, Madhya Pradesh',
+      default: 'Vidisha',
     },
     homeCountry: {
       type: String,
@@ -54,8 +54,8 @@ const UserSchema = new mongoose.Schema(
       tempUnit: { type: String, enum: ['C', 'F'], default: 'C' },
       currency: { type: String, default: 'INR' },
       homeCountry: { type: String, default: 'India' },
-      dateFormat: { type: String, default: 'DD/MM/YYYY' },
-      timeFormat: { type: String, enum: ['12h', '24h'], default: '24h' },
+      dateFormat: { type: String, default: 'DD-MM-YYYY' },
+      timeFormat: { type: String, enum: ['12h', '24h'], default: '12h' },
       locale: { type: String, default: 'en-IN' },
       theme: { type: String, enum: ['forest', 'ocean', 'sand', 'slate', 'dark', 'light'], default: 'forest' },
       themeFamily: { type: String, default: 'forest' },
